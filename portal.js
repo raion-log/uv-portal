@@ -1,5 +1,10 @@
 // UV 포털 — 로그인 뒤 역할별 화면. 데이터 보호는 서버 RLS(sql/portal.sql)가 한다; 여기는 받은 만큼만 그린다.
-import { roleOf, visiblePrograms, latestRelease, fmtBytes, validUntilLabel, releaseFormErrors } from './portal-logic.mjs';
+import { roleOf, visiblePrograms, latestRelease, fmtBytes, validUntilLabel, releaseFormErrors,
+  focusPrograms, focusFromLocation } from './portal-logic.mjs';
+
+// ★프로그램 전용 링크 — `?p=uv-global-reaction-editor`(또는 `#…`)로 들어오면 그 프로그램 하나만 보인다. 허브로 가는 단추는 없다.
+//   (사용자 2026-09-14: 「그 링크가 독립적으로만 작동하면 돼. 별도 허브로 안 넘어오고 그 프로그램만 볼 수 있게」)
+const FOCUS = focusFromLocation(location);
 
 // 공개 anon 키 — raion-admin·앱과 같은 프로젝트. 브라우저에 두라고 만든 키다(권한은 RLS 가 정한다).
 const SUPABASE_URL = 'https://dnflcjpjzqmrybtcleqy.supabase.co';
@@ -63,9 +68,12 @@ $('tabs').addEventListener('click', (e) => {
 
 // ── 내 프로그램 ─────────────────────────────────────────────────────────────
 function render() {
-  const mine = visiblePrograms(programs, me);
+  const all = visiblePrograms(programs, me);
+  const mine = focusPrograms(all, FOCUS);
   const grid = $('mine-grid'); grid.replaceChildren();
-  $('mine-empty').classList.toggle('hidden', mine.length > 0);
+  // 전용 링크인데 자격이 없으면 「열려 있지 않은 프로그램」, 링크 없이 자격이 하나도 없으면 「열린 프로그램 없음」
+  $('focus-empty').classList.toggle('hidden', !(FOCUS && mine.length === 0));
+  $('mine-empty').classList.toggle('hidden', !!FOCUS || mine.length > 0);
   for (const p of mine) {
     const rel = latestRelease(p.uvengers_releases);
     const m = (me.memberships || []).find((x) => x.program_code === p.code);

@@ -18,6 +18,12 @@
 보호는 서버 RLS 가 한다. 관리자 판정은 raion-admin 이 쓰는 `private.is_admin()` 그대로, 편집기 수강생 자격은 앱 관문이 보는
 `uvengers_editor_members` 그대로. 화면 파일은 공개지만 데이터는 로그인한 사람의 몫만 돌아온다.
 
+## 수강생에게 주는 링크
+
+프로그램 전용 링크는 주소 뒤에 코드를 붙인다 — `https://raion-log.github.io/uv-portal/?p=uv-global-reaction-editor`.
+그 링크로 들어오면 로그인 뒤 **그 프로그램 하나만** 보이고 다른 곳으로 가는 단추는 없다. 자격이 없는 계정은
+「이 계정에는 열려 있지 않은 프로그램입니다」만 본다. 공개 허브(`raion-log/uv`)는 그대로 둔다(사용자 2026-09-14).
+
 ## 처음 켜기
 
 1. `sql/portal.sql` 을 Supabase 프로젝트(`dnflcjpjzqmrybtcleqy`)에 적용한다(대시보드 SQL 편집기 또는 관리 API).

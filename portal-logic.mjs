@@ -49,6 +49,19 @@ export function validUntilLabel(valid_until, now = new Date()) {
   return days < 0 ? `${date} 만료` : `${date} 까지 (${days}일 남음)`;
 }
 
+/** 프로그램 전용 링크 — `?p=코드` 또는 `#코드`. 코드 모양(영문 소문자·숫자·하이픈)이 아니면 빈 문자열 */
+export function focusFromLocation(loc) {
+  const q = new URLSearchParams(loc?.search || '').get('p') || String(loc?.hash || '').replace(/^#/, '');
+  const code = String(q || '').trim();
+  return /^[a-z0-9-]+$/.test(code) ? code : '';
+}
+
+/** 전용 링크면 그 프로그램만, 아니면 그대로. 자격이 없는 코드면 빈 목록(화면이 「열려 있지 않은 프로그램」을 보인다) */
+export function focusPrograms(programs, focus) {
+  if (!focus) return programs || [];
+  return (programs || []).filter((p) => p && p.code === focus);
+}
+
 /** 판 등록 폼 검사 — 빈 것·모양이 틀린 것을 한국어로 돌려준다. 통과면 [] */
 export function releaseFormErrors(f) {
   const e = [];

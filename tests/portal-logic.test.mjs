@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { roleOf, membershipAlive, visiblePrograms, latestRelease, fmtBytes, validUntilLabel, releaseFormErrors }
-  from '../portal-logic.mjs';
+import { roleOf, membershipAlive, visiblePrograms, latestRelease, fmtBytes, validUntilLabel, releaseFormErrors,
+  focusPrograms, focusFromLocation } from '../portal-logic.mjs';
 
 const NOW = new Date('2026-09-14T00:00:00+09:00');
 const PROGRAMS = [
@@ -48,6 +48,22 @@ test('크기·기한 표기는 랜딩페이지와 같은 꼴이다', () => {
   assert.equal(validUntilLabel(null), '기한 없음');
   assert.match(validUntilLabel('2026-01-01T00:00:00+09:00', NOW), /만료$/);
 });
+
+test('프로그램 전용 링크(?p=코드)로 들어오면 그 프로그램 하나만 보인다', () => {
+  const me = { is_admin: false, memberships: [
+    { program_code: 'uv-global-reaction-editor', status: 'approved', valid_until: null },
+    { program_code: 'uv-vrewauto', status: 'approved', valid_until: null },
+  ] };
+  const mine = visiblePrograms(PROGRAMS, me, NOW);
+  assert.deepEqual(focusPrograms(mine, 'uv-vrewauto').map((p) => p.code), ['uv-vrewauto']);
+  assert.deepEqual(focusPrograms(mine, '').map((p) => p.code), ['uv-global-reaction-editor', 'uv-vrewauto']);   // 링크 없으면 전부
+  // 자격 없는 프로그램 링크로 들어오면 빈 목록 — 화면은 「이 계정에 열려 있지 않은 프로그램」을 보인다
+  assert.deepEqual(focusPrograms(mine, 'uv-old'), []);
+  assert.equal(focusFromLocation({ search: '?p=uv-vrewauto', hash: '' }), 'uv-vrewauto');
+  assert.equal(focusFromLocation({ search: '', hash: '#uv-global-reaction-editor' }), 'uv-global-reaction-editor');
+  assert.equal(focusFromLocation({ search: '?p=Bad%20Code!', hash: '' }), '');                      // 코드 모양이 아니면 무시
+});
+
 
 test('판 등록 폼은 빈 것과 틀린 모양을 한국어로 짚는다', () => {
   const ok = { program_code: 'uv-global-reaction-editor', version: '1.3.3', tag: 'v1.3.3-rc.6',
