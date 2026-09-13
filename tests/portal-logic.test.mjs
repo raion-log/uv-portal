@@ -1,0 +1,61 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { roleOf, membershipAlive, visiblePrograms, latestRelease, fmtBytes, validUntilLabel, releaseFormErrors }
+  from '../portal-logic.mjs';
+
+const NOW = new Date('2026-09-14T00:00:00+09:00');
+const PROGRAMS = [
+  { code: 'uv-global-reaction-editor', name: 'UV 글로벌 반응 편집기', active: true },
+  { code: 'uv-vrewauto', name: 'VrewAuto', active: true },
+  { code: 'uv-old', name: '은퇴', active: false },
+];
+
+test('관리자는 살아 있는 프로그램을 전부 본다, 은퇴한 것은 아무도 못 본다', () => {
+  const me = { is_admin: true, memberships: [] };
+  assert.deepEqual(visiblePrograms(PROGRAMS, me, NOW).map((p) => p.code), ['uv-global-reaction-editor', 'uv-vrewauto']);
+});
+
+test('수강생은 자격이 살아 있는 프로그램만 본다', () => {
+  const me = { is_admin: false, memberships: [
+    { program_code: 'uv-global-reaction-editor', status: 'approved', valid_until: '2027-01-31T00:00:00+09:00' },
+    { program_code: 'uv-vrewauto', status: 'approved', valid_until: '2026-01-01T00:00:00+09:00' },   // 만료
+  ] };
+  assert.deepEqual(visiblePrograms(PROGRAMS, me, NOW).map((p) => p.code), ['uv-global-reaction-editor']);
+  assert.equal(roleOf(me), 'student');
+});
+
+test('자격 판정 — 기한 없음은 산다, 거절·정지는 죽는다', () => {
+  assert.equal(membershipAlive({ status: 'approved', valid_until: null }, NOW), true);
+  assert.equal(membershipAlive({ status: 'rejected', valid_until: null }, NOW), false);
+  assert.equal(membershipAlive({ status: 'suspended', valid_until: '2027-01-01' }, NOW), false);
+  assert.equal(membershipAlive(null, NOW), false);
+});
+
+test('최신 판은 게시일 기준이고 후보를 뺄 수 있다', () => {
+  const rel = [
+    { version: '1.3.0', tag: 'v1.3.0', published_at: '2026-09-08T16:09:46Z', is_prerelease: false },
+    { version: '1.3.3', tag: 'v1.3.3-rc.6', published_at: '2026-09-13T10:00:00Z', is_prerelease: true },
+  ];
+  assert.equal(latestRelease(rel).tag, 'v1.3.3-rc.6');
+  assert.equal(latestRelease(rel, { includePrerelease: false }).tag, 'v1.3.0');
+  assert.equal(latestRelease([]), null);
+});
+
+test('크기·기한 표기는 랜딩페이지와 같은 꼴이다', () => {
+  assert.equal(fmtBytes(670338555), '639MB (670,338,555 바이트)');
+  assert.equal(fmtBytes('x'), '');
+  assert.equal(validUntilLabel('2027-01-31T00:00:00+09:00', NOW), '2027. 1. 31. 까지 (139일 남음)');
+  assert.equal(validUntilLabel(null), '기한 없음');
+  assert.match(validUntilLabel('2026-01-01T00:00:00+09:00', NOW), /만료$/);
+});
+
+test('판 등록 폼은 빈 것과 틀린 모양을 한국어로 짚는다', () => {
+  const ok = { program_code: 'uv-global-reaction-editor', version: '1.3.3', tag: 'v1.3.3-rc.6',
+    file_name: 'UV-Global-Reaction-Editor_1.3.3_x64-setup.exe', bytes: 670338555,
+    sha256: 'fe28374388f3f4acc5fbb23ac1f4e9263d4da6162b4faa5bd9a288681cf70ed0',
+    download_url: 'https://github.com/raion-log/uv-global-reaction-editor-releases/releases/download/v1.3.3-rc.6/x.exe',
+    published_at: '2026-09-13' };
+  assert.deepEqual(releaseFormErrors(ok), []);
+  const bad = releaseFormErrors({ ...ok, tag: '1.3.3', sha256: 'abc', bytes: 0 });
+  assert.equal(bad.length, 3, bad.join(' / '));
+});
