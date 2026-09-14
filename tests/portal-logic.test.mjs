@@ -97,3 +97,27 @@ test('수강생 카드에는 정식 최신과 그보다 새 후보가 따로 보
   assert.equal(l3.candidate.tag, 'v1.3.3-rc.6');
   assert.deepEqual(releaseLines([]), { stable: null, candidate: null, history: [] });
 });
+
+const OK_FORM = { program_code: 'uv-global-reaction-editor', version: '1.3.3', tag: 'v1.3.3-rc.6',
+  file_name: 'UV-Global-Reaction-Editor_1.3.3_x64-setup.exe', bytes: 670338555,
+  sha256: 'fe28374388f3f4acc5fbb23ac1f4e9263d4da6162b4faa5bd9a288681cf70ed0',
+  download_url: 'https://github.com/raion-log/uv-global-reaction-editor-releases/releases/download/v1.3.3-rc.6/x.exe',
+  published_at: '2026-09-13' };
+
+test('카드는 가장 새 판 하나를 받으라고 내밀고 나머지는 지난 판으로 접는다', async () => {
+  const { pickRelease } = await import('../portal-logic.mjs');
+  const rel = [
+    { version: '1.3.0', tag: 'v1.3.0', published_at: '2026-09-08T16:09:46Z', is_prerelease: false },
+    { version: '1.3.3', tag: 'v1.3.3-rc.6', published_at: '2026-09-13T10:00:00Z', is_prerelease: true },
+  ];
+  const { pick, others } = pickRelease(rel);
+  assert.equal(pick.tag, 'v1.3.3-rc.6');                       // 후보라도 가장 새 것 하나 — 「뭘 받아야 하는지」가 하나여야 한다
+  assert.deepEqual(others.map((r) => r.tag), ['v1.3.0']);
+  assert.deepEqual(pickRelease([]), { pick: null, others: [] });
+});
+
+test('바뀐 점은 비워도 되고 240자 안이어야 한다', () => {
+  assert.deepEqual(releaseFormErrors({ ...OK_FORM, notes: '두 줄\n요약' }), []);
+  assert.deepEqual(releaseFormErrors({ ...OK_FORM, notes: '' }), []);
+  assert.deepEqual(releaseFormErrors({ ...OK_FORM, notes: 'x'.repeat(241) }), ['바뀐 점은 240자 안으로 줄여 주세요']);
+});

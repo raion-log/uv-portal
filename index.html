@@ -56,7 +56,7 @@
         </div>
         <div class="card">
           <h2>배포 기록</h2>
-          <p class="faint">등록된 판 전부, 새 것부터. 수강생 카드에는 정식 최신과 그보다 새 후보만 보이고 나머지는 「모든 판」에 접혀 있습니다.</p>
+          <p class="faint">등록된 판 전부, 새 것부터. 수강생 카드에는 가장 새 판 하나와 바뀐 점만 보이고, 나머지 판과 SHA-256 은 「확인값 · 지난 판」에 접혀 있습니다.</p>
           <div style="overflow-x:auto"><table id="admin-releases"></table></div>
         </div>
         <div class="two">
@@ -75,6 +75,7 @@
             </div>
             <label>SHA-256</label><input id="rel-sha" placeholder="64자리">
             <label>다운로드 링크</label><input id="rel-url" placeholder="https://github.com/…/releases/download/…">
+            <label>바뀐 점(두 줄 정도 — 수강생 카드에 그대로 보입니다)</label><textarea id="rel-notes-text" rows="3" placeholder="첫 줄: 가장 큰 변화&#10;둘째 줄: 그다음 변화"></textarea>
             <label>릴리스 노트 링크(선택)</label><input id="rel-notes" placeholder="https://github.com/…/releases/tag/…">
             <label><input type="checkbox" id="rel-pre" checked style="width:auto"> 후보(RC)</label>
             <div class="row" style="margin-top:10px"><button class="btn primary" id="btn-rel-save">등록</button></div>

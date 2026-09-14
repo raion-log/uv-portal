@@ -42,15 +42,18 @@ main{max-width:1040px;margin:0 auto;padding:24px 24px 96px}
 .faint{color:var(--faint);font-size:.82rem}
 .section{letter-spacing:.18em;font-size:.75rem;font-weight:700;color:var(--ac);margin:0 0 14px}
 
-/* ── 판 줄(정식·후보) ─────────────────────────────── */
-.grid{display:grid;gap:16px}
-.rel{border:1px solid var(--line);border-radius:12px;padding:16px 18px 18px;background:rgba(13,21,38,.55);margin-top:12px}
-.rel.stable{border-top:2px solid var(--ok)}
-.rel.rc{border-top:2px solid var(--warn)}
-.rel-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:6px}
-.rel-head b{color:#fff;font-size:1.08rem}
-.meta{display:grid;grid-template-columns:82px 1fr;gap:3px 12px;font-size:.86rem;margin:6px 0 12px;color:var(--tx2)}
+/* ── 프로그램 카드 — 한 줄에 셋, 카드 하나에 받을 것 하나 (사용자 2026-09-14) ── */
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;align-items:start}
+.prog{margin-bottom:0;padding:22px 22px 20px}
+.prog h3{font-size:1.28rem}
+.prog .tagline{font-size:.92rem;margin-bottom:14px}
+.ver{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:0 0 8px}
+.ver b{color:#fff;font-size:1.15rem}
+.notes{white-space:pre-line;color:var(--tx2);font-size:.9rem;line-height:1.6;margin:0 0 12px;padding-left:12px;border-left:2px solid var(--line2)}
+.meta{display:grid;grid-template-columns:64px 1fr;gap:3px 10px;font-size:.84rem;margin:6px 0 12px;color:var(--tx2)}
 .meta .k{color:var(--sub)}
+.prog .dl{flex:1 1 100%}
+td.notes-cell{white-space:pre-line;min-width:220px;font-size:.84rem}
 code{
   font-family:Consolas,"D2Coding",monospace;font-size:.9em;color:#9fb0d8;
   background:rgba(255,255,255,.05);padding:1px 6px;border-radius:5px;word-break:break-all;
@@ -86,11 +89,12 @@ code{
 
 /* ── 입력 ─────────────────────────────────────────── */
 label{display:block;font-size:.78rem;color:var(--sub);margin:10px 0 4px;font-weight:700;letter-spacing:.04em}
-input,select{
+input,select,textarea{
   width:100%;padding:10px 12px;border-radius:9px;border:1px solid var(--line2);
   background:rgba(13,21,38,.8);color:var(--tx);font:inherit;font-size:.95rem;
 }
-input:focus,select:focus{outline:2px solid var(--ac);outline-offset:1px;border-color:var(--ac2)}
+textarea{resize:vertical;line-height:1.5}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--ac);outline-offset:1px;border-color:var(--ac2)}
 input[type=checkbox]{width:auto;margin-right:6px;vertical-align:middle}
 .msg{padding:10px 14px;border-radius:10px;font-size:.9rem;margin:10px 0;border:1px solid transparent}
 .msg.err{border-color:#5a3a3a;background:rgba(224,121,111,.12);color:#f0a59c}
@@ -129,11 +133,12 @@ details.hist ul{margin:10px 0 0;padding:0;list-style:none;display:grid;gap:6px;f
 .login{max-width:460px;margin:32px auto}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 footer{max-width:1040px;margin:0 auto;padding:0 24px;color:#5d6781;font-size:.78rem}
+@media (max-width:1000px){ .grid{grid-template-columns:repeat(2,minmax(0,1fr))} }
 @media (max-width:700px){
   header{padding:32px 18px 0}
   header .brand .uv{font-size:2.1rem}
   main{padding:16px 18px 64px}
-  .two{grid-template-columns:1fr}
+  .two,.grid{grid-template-columns:1fr}
   .card,.prog{padding:22px 20px 20px}
 }
 @media (prefers-reduced-motion:reduce){details.hist summary::before{transition:none}}

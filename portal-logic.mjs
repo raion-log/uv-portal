@@ -73,7 +73,14 @@ export function releaseFormErrors(f) {
   if (!/^[0-9a-f]{64}$/.test(String(f.sha256 || '').toLowerCase())) e.push('SHA-256 은 64자리 16진수여야 합니다');
   if (!/^https:\/\//.test(String(f.download_url || ''))) e.push('다운로드 링크는 https:// 로 시작해야 합니다');
   if (!f.published_at) e.push('게시일을 넣으세요');
+  if (String(f.notes || '').length > 240) e.push('바뀐 점은 240자 안으로 줄여 주세요');
   return e;
+}
+
+/** 카드가 내미는 판 하나(가장 새 것, 후보 포함)와 나머지(새 것부터). 받을 것이 하나여야 헷갈리지 않는다(사용자 2026-09-14). */
+export function pickRelease(releases) {
+  const { history } = releaseLines(releases);
+  return { pick: history[0] || null, others: history.slice(1) };
 }
 
 /** 카드에 보일 판 줄 — 정식 최신, 그보다 새 후보(없으면 null), 전체 기록(새 것부터).

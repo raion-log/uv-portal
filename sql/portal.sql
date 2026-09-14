@@ -32,6 +32,8 @@ create table if not exists public.uvengers_releases (
   created_at    timestamptz not null default now(),
   unique (program_code, tag)
 );
+-- 바뀐 점 두 줄 요약 — 수강생 카드에 그대로 보인다(사용자 2026-09-14 「바뀐 점도 2줄 정도는 써줘」). 이미 있는 표에도 더한다.
+alter table public.uvengers_releases add column if not exists notes text;
 
 -- 앞으로 생길 프로그램의 수강생 자격(편집기는 기존 표를 쓴다)
 create table if not exists public.uvengers_program_members (
@@ -138,6 +140,12 @@ values ('uv-global-reaction-editor', '1.3.3', 'v1.3.3-rc.6', 'UV-Global-Reaction
         'https://github.com/raion-log/uv-global-reaction-editor-releases/releases/tag/v1.3.0',
         '2026-09-09 01:09:46+09', false)
 on conflict (program_code, tag) do nothing;
+
+-- 첫 두 판의 바뀐 점(CHANGELOG 요약). 비어 있을 때만 채운다 — 관리자가 고친 글을 덮지 않는다.
+update public.uvengers_releases set notes = E'AI 응답이 멈춰도 전체가 멈추지 않고, 자료 화면이 이야기와 맞습니다(다른 나라 이야기에 한국 화면이 오지 않음).\n나레이션 분량이 레퍼런스 수준으로, 일본어·번체 발음 사전, 설정에 「내 계정」 탭, 진행 화면 썸네일 후보가 오른쪽 열에.'
+ where program_code = 'uv-global-reaction-editor' and tag = 'v1.3.3-rc.6' and notes is null;
+update public.uvengers_releases set notes = E'자막이 막혀도 소리로 직접 재서 분량을 정하고, 원본 소리에서 음악·효과음을 빼 목소리만 남깁니다.\n나레이션이 레퍼런스만큼(분당 140자) 들어갑니다.'
+ where program_code = 'uv-global-reaction-editor' and tag = 'v1.3.0' and notes is null;
 
 commit;
 

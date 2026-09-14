@@ -1,5 +1,5 @@
 // UV 포털 — 로그인 뒤 역할별 화면. 데이터 보호는 서버 RLS(sql/portal.sql)가 한다; 여기는 받은 만큼만 그린다.
-import { roleOf, visiblePrograms, latestRelease, releaseLines, fmtBytes, validUntilLabel, releaseFormErrors,
+import { roleOf, visiblePrograms, latestRelease, pickRelease, fmtBytes, validUntilLabel, releaseFormErrors,
   focusPrograms, focusFromLocation } from './portal-logic.mjs';
 
 // ★프로그램 전용 링크 — `?p=uv-global-reaction-editor`(또는 `#…`)로 들어오면 그 프로그램 하나만 보인다. 허브로 가는 단추는 없다.
@@ -52,7 +52,7 @@ async function enter(session) {
 
 async function load() {
   const { data, error } = await sb.from('uvengers_programs')
-    .select('code,name,tagline,guide_url,landing_url,sort,active,uvengers_releases(version,tag,file_name,bytes,sha256,download_url,notes_url,published_at,is_prerelease)')
+    .select('code,name,tagline,guide_url,landing_url,sort,active,uvengers_releases(version,tag,file_name,bytes,sha256,download_url,notes,notes_url,published_at,is_prerelease)')
     .order('sort');
   programs = error ? [] : (data || []);
   if (error) console.error('프로그램을 못 읽었습니다', error);
@@ -74,33 +74,34 @@ function render() {
   // 전용 링크인데 자격이 없으면 「열려 있지 않은 프로그램」, 링크 없이 자격이 하나도 없으면 「열린 프로그램 없음」
   $('focus-empty').classList.toggle('hidden', !(FOCUS && mine.length === 0));
   $('mine-empty').classList.toggle('hidden', !!FOCUS || mine.length > 0);
-  // ★판은 정식 최신과 그보다 새 후보를 따로 그린다. 최신 하나만 그리면 정식 판이 숨는다(사용자 2026-09-14 「하나만 보이는 거 같아」).
-  const line = (r, kind) => `<div class="rel ${kind}">
-        <div class="rel-head"><span class="badge ${kind}">${kind === 'stable' ? '정식' : '후보'}</span><b>${esc(r.version)}${kind === 'rc' ? ' ' + esc(r.tag.replace(/^v[\d.]+-rc\./, 'RC')) : ''}</b><span class="faint">${esc(r.tag)} · ${esc(String(r.published_at).slice(0, 10))}</span></div>
-        <div class="meta">
-          <span class="k">파일</span><code>${esc(r.file_name)}</code>
-          <span class="k">크기</span><span>${esc(fmtBytes(r.bytes))}</span>
-          <span class="k">SHA-256</span><code>${esc(r.sha256)}</code>
-        </div>
-        <div class="row">
-          <a class="dl" href="${esc(r.download_url)}">${kind === 'stable' ? '정식 판' : '후보 판'} 설치기 다운로드</a>
-          ${r.notes_url ? `<a class="btn small" href="${esc(r.notes_url)}" target="_blank" rel="noopener">바뀐 점</a>` : ''}
-        </div>
-      </div>`;
-  const histItem = (r) => `<li><span class="badge ${r.is_prerelease ? 'rc' : 'stable'}">${r.is_prerelease ? '후보' : '정식'}</span> ${esc(r.version)} <code>${esc(r.tag)}</code> · ${esc(String(r.published_at).slice(0, 10))} · ${esc(fmtBytes(r.bytes))} · <a href="${esc(r.download_url)}">받기</a></li>`;
+  // ★프로그램 하나 = 카드 하나, 받을 것도 하나. 가장 새 판(후보 포함)을 내밀고 바뀐 점 두 줄을 붙인다. 나머지 판과 확인값(SHA)은 접는다.
+  //   (사용자 2026-09-14 「같은 프로그램은 하나로 합쳐서… 뭘 받아야하는지 모르겠음」 「바뀐 점도 2줄 정도는 써줘」)
+  const kindOf = (r) => (r.is_prerelease ? 'rc' : 'stable');
+  const label = (r) => `${esc(r.version)}${r.is_prerelease ? ' ' + esc(r.tag.replace(/^v[\d.]+-rc\./, 'RC')) : ''}`;
+  const histItem = (r) => `<li><span class="badge ${kindOf(r)}">${r.is_prerelease ? '후보' : '정식'}</span> ${label(r)} · ${esc(String(r.published_at).slice(0, 10))} · ${esc(fmtBytes(r.bytes))} · <a href="${esc(r.download_url)}">받기</a></li>`;
   for (const p of mine) {
-    const L = releaseLines(p.uvengers_releases);
+    const { pick, others } = pickRelease(p.uvengers_releases);
     const m = (me.memberships || []).find((x) => x.program_code === p.code);
     const card = document.createElement('div'); card.className = 'prog';
     card.innerHTML = `
       <h3>${esc(p.name)}</h3>
       <p class="tagline">${esc(p.tagline || '')}</p>
-      ${L.stable ? line(L.stable, 'stable') : ''}
-      ${L.candidate ? line(L.candidate, 'rc') : ''}
-      ${!L.stable && !L.candidate ? '<div class="faint">아직 배포된 판이 없습니다</div>' : ''}
-      <div class="meta" style="margin-top:14px"><span class="k">이용 기한</span><span>${esc(roleOf(me) === 'admin' && !m ? '관리자' : validUntilLabel(m?.valid_until))}</span></div>
-      ${p.guide_url ? `<div class="row"><a class="btn" href="${esc(p.guide_url)}" target="_blank" rel="noopener">설치 안내</a></div>` : ''}
-      ${L.history.length > 1 ? `<details class="hist"><summary>모든 판 ${L.history.length}개</summary><ul>${L.history.map(histItem).join('')}</ul></details>` : ''}`;
+      ${pick ? `
+      <div class="ver"><span class="badge ${kindOf(pick)}">${pick.is_prerelease ? '후보' : '정식'}</span><b>${label(pick)}</b><span class="faint">${esc(String(pick.published_at).slice(0, 10))}</span></div>
+      ${pick.notes ? `<p class="notes">${esc(pick.notes)}</p>` : ''}
+      <div class="meta">
+        <span class="k">파일</span><code>${esc(pick.file_name)}</code>
+        <span class="k">크기</span><span>${esc(fmtBytes(pick.bytes))}</span>
+      </div>
+      <div class="row">
+        <a class="dl" href="${esc(pick.download_url)}">설치기 다운로드</a>
+        ${p.guide_url ? `<a class="btn small" href="${esc(p.guide_url)}" target="_blank" rel="noopener">설치 안내</a>` : ''}
+        ${pick.notes_url ? `<a class="btn small" href="${esc(pick.notes_url)}" target="_blank" rel="noopener">바뀐 점 전체</a>` : ''}
+      </div>` : '<div class="faint">아직 배포된 판이 없습니다</div>'}
+      <div class="meta"><span class="k">이용 기한</span><span>${esc(roleOf(me) === 'admin' && !m ? '관리자' : validUntilLabel(m?.valid_until))}</span></div>
+      ${pick ? `<details class="hist"><summary>확인값${others.length ? ` · 지난 판 ${others.length}개` : ''}</summary>
+        <div class="faint">SHA-256 <code>${esc(pick.sha256)}</code></div>
+        ${others.length ? `<ul>${others.map(histItem).join('')}</ul>` : ''}</details>` : ''}`;
     grid.append(card);
   }
   if (roleOf(me) === 'admin') renderAdmin();
@@ -124,11 +125,12 @@ function renderAdmin() {
   // 배포 기록 — 프로그램 가리지 않고 전부, 새 것부터
   const hist = programs.flatMap((p) => (p.uvengers_releases || []).map((r) => ({ ...r, program: p.name })))
     .sort((a, b) => new Date(b.published_at) - new Date(a.published_at));
-  $('admin-releases').innerHTML = `<thead><tr><th>게시일</th><th>프로그램</th><th>판</th><th>종류</th><th>파일</th><th>크기</th><th>SHA-256</th><th></th></tr></thead><tbody>${hist.map((r) => `<tr>
+  $('admin-releases').innerHTML = `<thead><tr><th>게시일</th><th>프로그램</th><th>판</th><th>종류</th><th>바뀐 점</th><th>파일 · 크기</th><th>SHA-256</th><th></th></tr></thead><tbody>${hist.map((r) => `<tr>
       <td class="nw">${esc(String(r.published_at).slice(0, 10))}</td><td><b>${esc(r.program)}</b></td><td class="nw">${esc(r.version)} <code>${esc(r.tag)}</code></td>
       <td><span class="badge ${r.is_prerelease ? 'rc' : 'stable'}">${r.is_prerelease ? '후보' : '정식'}</span></td>
-      <td><code>${esc(r.file_name)}</code></td><td>${esc(fmtBytes(r.bytes))}</td><td><code>${esc(String(r.sha256 || '').slice(0, 12))}…</code></td>
-      <td><a href="${esc(r.download_url)}">받기</a>${r.notes_url ? ` · <a href="${esc(r.notes_url)}" target="_blank" rel="noopener">노트</a>` : ''}</td>
+      <td class="notes-cell">${r.notes ? esc(r.notes) : '<span class="faint">없음</span>'}</td>
+      <td><code>${esc(r.file_name)}</code><br><span class="faint">${esc(fmtBytes(r.bytes))}</span></td><td><code>${esc(String(r.sha256 || '').slice(0, 12))}…</code></td>
+      <td class="nw"><a href="${esc(r.download_url)}">받기</a>${r.notes_url ? ` · <a href="${esc(r.notes_url)}" target="_blank" rel="noopener">노트</a>` : ''}</td>
     </tr>`).join('') || '<tr><td colspan="8" class="faint">아직 등록된 판이 없습니다</td></tr>'}</tbody>`;
   const sel = $('rel-program');
   sel.replaceChildren(...programs.map((p) => { const o = document.createElement('option'); o.value = p.code; o.textContent = p.name; return o; }));
@@ -139,6 +141,7 @@ $('btn-rel-save').addEventListener('click', async () => {
     program_code: $('rel-program').value, version: $('rel-version').value.trim(), tag: $('rel-tag').value.trim(),
     file_name: $('rel-file').value.trim(), bytes: Number(String($('rel-bytes').value).replace(/[^0-9]/g, '')),
     sha256: $('rel-sha').value.trim().toLowerCase(), download_url: $('rel-url').value.trim(),
+    notes: $('rel-notes-text').value.trim() || null,
     notes_url: $('rel-notes').value.trim() || null, published_at: $('rel-date').value, is_prerelease: $('rel-pre').checked,
   };
   const errors = releaseFormErrors(f);
