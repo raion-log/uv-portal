@@ -1,6 +1,6 @@
 // UV 포털 — 로그인 뒤 역할별 화면. 데이터 보호는 서버 RLS(sql/portal.sql)가 한다; 여기는 받은 만큼만 그린다.
 import { roleOf, visiblePrograms, latestRelease, pickRelease, notesLines, cohortMatrix, fmtBytes, fmtDate, versionLabel, pickMembership,
-  validUntilLabel, releaseFormErrors, focusPrograms, focusFromLocation } from './portal-logic.mjs';
+  validUntilLabel, releaseFormErrors, focusPrograms, focusFromLocation, toGmail, validGmailLocal, passwordProblem } from './portal-logic.mjs';
 
 // ★프로그램 전용 링크 — `?p=uv-global-reaction-editor`(또는 `#…`)로 들어오면 그 프로그램 하나만 보인다. 허브로 가는 단추는 없다.
 //   (사용자 2026-09-14: 「그 링크가 독립적으로만 작동하면 돼. 별도 허브로 안 넘어오고 그 프로그램만 볼 수 있게」)
@@ -25,21 +25,45 @@ let programs = [];      // RLS 가 걸러 준 프로그램(+판)
 let cohorts = [];       // 관리자만: portal_cohorts() — 기수·회원 수
 let links = [];         // 관리자만: uvengers_program_cohorts — 기수 × 프로그램
 
-// ── 로그인 ──────────────────────────────────────────────────────────────────
-$('btn-google').addEventListener('click', async () => {
-  try { if (FOCUS) sessionStorage.setItem(FOCUS_KEY, FOCUS); else sessionStorage.removeItem(FOCUS_KEY); } catch {}
-  const { error } = await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.origin + location.pathname } });
-  if (error) msg('login-msg', '구글 로그인을 열지 못했습니다: ' + error.message);
-});
+// ── 로그인 — 편집기 앱과 같은 방식(Google 이메일 아이디 + 비밀번호). 구글 로그인 단추는 뺐다(사용자 2026-09-14) ──
 // 단추 연타 막기 — 도는 동안 잠그고 끝나면 푼다(적대평가 2026-09-14)
 const busy = async (btn, fn) => { if (btn.disabled) return; btn.disabled = true; try { await fn(); } finally { btn.disabled = false; } };
 $('btn-email').addEventListener('click', () => busy($('btn-email'), async () => {
   msg('login-msg', '');
-  const { error } = await sb.auth.signInWithPassword({ email: $('login-email').value.trim(), password: $('login-pw').value });
-  if (error) msg('login-msg', '로그인하지 못했습니다. 이메일과 비밀번호를 확인해 주세요.');
+  const idInput = $('login-email').value.trim(), password = $('login-pw').value;
+  if (!idInput || !password) { msg('login-msg', '이메일 아이디와 비밀번호를 입력해 주세요.'); return; }
+  if (!validGmailLocal(idInput)) { msg('login-msg', '이메일 아이디(@ 앞부분)만 입력해 주세요.'); return; }
+  const { error } = await sb.auth.signInWithPassword({ email: toGmail(idInput), password });
+  $('login-pw').value = '';   // 앱과 같이 비밀번호 칸은 바로 비운다
+  if (error) msg('login-msg', '이메일 아이디 또는 비밀번호가 올바르지 않습니다. 자동으로 채워진 비밀번호라면 지난 것일 수 있으니 직접 입력해 보세요.');
 }));
 $('login-pw').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('btn-email').click(); });
 $('btn-logout').addEventListener('click', async () => { await sb.auth.signOut(); location.reload(); });
+
+// ── 비밀번호 재설정 — 앱과 같은 방식: 메일의 8자리 코드로 확인한 뒤 새 비밀번호를 정한다(리디렉트 없음) ──
+const showReset = (on) => { $('view-reset').classList.toggle('hidden', !on); $('view-login').classList.toggle('hidden', on); msg('reset-msg', ''); };
+$('btn-forgot').addEventListener('click', () => { $('reset-email').value = $('login-email').value.trim(); showReset(true); });
+$('btn-reset-back').addEventListener('click', (e) => { e.preventDefault(); showReset(false); });
+$('btn-reset-send').addEventListener('click', () => busy($('btn-reset-send'), async () => {
+  const idInput = $('reset-email').value.trim();
+  if (!validGmailLocal(idInput)) { msg('reset-msg', '이메일 아이디(@ 앞부분)만 입력해 주세요.'); return; }
+  const { error } = await sb.auth.resetPasswordForEmail(toGmail(idInput));
+  if (error) { msg('reset-msg', '코드를 보내지 못했습니다: ' + error.message); return; }
+  $('reset-step2').classList.remove('hidden');
+  msg('reset-msg', `${toGmail(idInput)} 으로 8자리 코드를 보냈습니다. 1시간 안에 아래에 넣어 주세요.`, 'ok');
+}));
+$('btn-reset-apply').addEventListener('click', () => busy($('btn-reset-apply'), async () => {
+  const idInput = $('reset-email').value.trim(), code = $('reset-code').value.replace(/\D/g, ''), pw = $('reset-pw').value;
+  const problem = passwordProblem(pw);
+  if (problem) { msg('reset-msg', problem); return; }
+  if (code.length !== 8) { msg('reset-msg', '메일로 온 8자리 코드를 넣어 주세요.'); return; }
+  const v = await sb.auth.verifyOtp({ email: toGmail(idInput), token: code, type: 'recovery' });
+  if (v.error) { msg('reset-msg', '코드가 맞지 않거나 만료됐습니다. 다시 보내서 새 코드로 시도해 주세요.'); return; }
+  const u = await sb.auth.updateUser({ password: pw });
+  $('reset-pw').value = '';
+  if (u.error) { msg('reset-msg', '비밀번호를 바꾸지 못했습니다: ' + u.error.message); return; }
+  location.reload();   // 코드 확인으로 이미 로그인된 상태 — 새 비밀번호로 들어온 화면을 그린다
+}));
 
 // ★enter 는 사람마다 한 번 — INITIAL_SESSION·SIGNED_IN·TOKEN_REFRESHED 가 같은 세션을 거듭 넘겨도 화면(폼·표)을 다시 지우지 않는다
 let entered = '';

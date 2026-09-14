@@ -195,3 +195,21 @@ test('카드의 자격 줄은 살아 있는 자격을 고른다 — 만료된 me
   // 편집기 회원의 valid_until NULL 은 앱과 같이 「미승인」 — 살아 있는 자격이 아니다
   assert.equal(membershipAlive({ status: 'approved', valid_until: null, via: 'editor' }, NOW), false);
 });
+
+// ── 로그인은 편집기 앱과 같은 규칙(app/src/js/auth.js: toGmail·validGmailLocal·PW_MIN=6) ──
+test('아이디는 @ 앞부분만 받아 gmail 로 만든다 — 전체 주소를 붙여 넣어도 앞부분만, 소문자로', async () => {
+  const { toGmail, validGmailLocal } = await import('../portal-logic.mjs');
+  assert.equal(toGmail(' UvGood2026 '), 'uvgood2026@gmail.com');
+  assert.equal(toGmail('uvgood2026@gmail.com'), 'uvgood2026@gmail.com');
+  assert.equal(toGmail('someone@naver.com'), 'someone@gmail.com');       // 앱과 같이 다른 도메인은 gmail 로 강제
+  assert.equal(toGmail(''), '');
+  assert.equal(validGmailLocal('uv.good_2026+a'), true);
+  assert.equal(validGmailLocal('한글'), false);
+  assert.equal(validGmailLocal(''), false);
+});
+
+test('새 비밀번호는 길이만 본다(6자 이상) — 앱·서버 정책과 같다', async () => {
+  const { passwordProblem } = await import('../portal-logic.mjs');
+  assert.equal(passwordProblem('abcde'), '비밀번호는 6자 이상이어야 합니다.');
+  assert.equal(passwordProblem('abcdef'), '');
+});

@@ -11,12 +11,18 @@
 
 | 파일 | 무엇 |
 |---|---|
-| `index.html` · `portal.js` · `portal.css` | 화면. supabase-js(anon 키)로 로그인·조회 |
+| `index.html` · `portal.js` · `portal.css` | 화면. supabase-js(anon 키)로 로그인·조회. 로그인은 편집기 앱과 같은 규칙(Google 이메일 아이디 + 비밀번호, 구글 로그인 단추 없음) |
 | `portal-logic.mjs` | 순수 계산(역할·자격·최신 판·표기) — `node --test tests/portal-logic.test.mjs`(이 Node 에서는 폴더 인자가 실패) |
 | `sql/portal.sql` | 표 3개(`uvengers_programs`·`uvengers_releases`·`uvengers_program_members`), 판정 함수, RLS, 첫 데이터 |
 
 보호는 서버 RLS 가 한다. 관리자 판정은 raion-admin 이 쓰는 `private.is_admin()` 그대로, 편집기 수강생 자격은 앱 관문이 보는
 `uvengers_editor_members` 그대로. 화면 파일은 공개지만 데이터는 로그인한 사람의 몫만 돌아온다.
+
+## 로그인 계정
+
+편집기 앱에 가입할 때 쓴 **Google 이메일 아이디(@ 앞부분)** 와 **앱에서 정한 비밀번호** 그대로다. 같은 Supabase 프로젝트라 계정이 하나다 —
+포털에서 새로 가입하지 않는다. 비밀번호를 잊으면 로그인 화면의 「비밀번호를 잊으셨나요?」에서 앱과 같은 방식(메일의 8자리 코드 + 새 비밀번호 6자 이상)으로 바꾼다.
+아직 가입 전이면 편집기 앱에서 가입 신청 → 관리자 승인 뒤 포털에 프로그램이 보인다.
 
 ## 수강생에게 주는 링크
 
@@ -27,7 +33,7 @@
 ## 처음 켜기
 
 1. `sql/portal.sql` 을 Supabase 프로젝트(`dnflcjpjzqmrybtcleqy`)에 적용한다(대시보드 SQL 편집기 또는 관리 API).
-2. Supabase Auth → URL Configuration 의 Redirect URLs 에 `https://raion-log.github.io/uv-portal/` 를 더한다(Google 로그인).
+2. (구글 로그인은 뺐다 — 사용자 2026-09-14. Redirect URL 은 있어도 무방하다.)
 3. 관리자 계정(`uvengers_members.role='admin'`)으로 로그인해 「프로그램 관리」가 보이는지, 수강생 계정으로 「내 프로그램」에
    자기 것만 보이는지 확인한다.
 

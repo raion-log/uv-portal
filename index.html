@@ -21,19 +21,38 @@
 
   <main>
     <!-- 로그인 전 -->
+    <!-- 로그인은 편집기 앱과 똑같이: Google 이메일 아이디(@ 앞부분) + 앱에서 정한 비밀번호. 구글 로그인 단추는 뺐다(사용자 2026-09-14). -->
     <section class="card login" id="view-login">
       <h2>로그인</h2>
-      <p class="muted">프로그램을 설치할 때 쓴 계정으로 들어오세요. 관리자는 관리자 계정으로.</p>
-      <button class="btn primary" id="btn-google" style="width:100%;justify-content:center">Google 로 로그인</button>
-      <p class="faint" style="text-align:center;margin:10px 0">또는 이메일</p>
-      <label for="login-email">이메일</label>
-      <input id="login-email" type="email" autocomplete="username">
+      <p class="muted">편집기 앱에 가입할 때 쓴 <b>Google 이메일 아이디</b>와 <b>그때 정한 비밀번호</b>로 들어오세요. 여기서 새로 가입하지 않습니다.</p>
+      <label for="login-email">Google 이메일 아이디 (@ 앞부분만)</label>
+      <div class="row nowrap"><input id="login-email" type="text" autocomplete="username" placeholder="예: uvgood2026" autocapitalize="off" spellcheck="false"><span class="faint">@gmail.com</span></div>
       <label for="login-pw">비밀번호</label>
       <input id="login-pw" type="password" autocomplete="current-password">
       <div class="row" style="margin-top:12px">
-        <button class="btn" id="btn-email">이메일로 로그인</button>
+        <button class="btn primary" id="btn-email">로그인</button>
+        <button class="btn small" id="btn-forgot" type="button">비밀번호를 잊으셨나요?</button>
       </div>
       <div id="login-msg"></div>
+      <p class="faint" style="margin:14px 0 0">아직 가입하지 않았다면 편집기 앱에서 가입 신청을 먼저 해 주세요. 관리자 승인 뒤에 프로그램이 보입니다.</p>
+    </section>
+
+    <!-- 비밀번호 재설정 — 앱과 같은 방식: 메일로 온 8자리 코드 + 새 비밀번호(6자 이상) -->
+    <section class="card login hidden" id="view-reset">
+      <h2>비밀번호 재설정</h2>
+      <p class="muted">가입한 Google 이메일로 <b>8자리 코드</b>를 보내드립니다. 코드와 새 비밀번호를 넣으면 바로 바뀝니다.</p>
+      <label for="reset-email">Google 이메일 아이디 (@ 앞부분만)</label>
+      <div class="row nowrap"><input id="reset-email" type="text" autocomplete="username" autocapitalize="off" spellcheck="false"><span class="faint">@gmail.com</span></div>
+      <div class="row" style="margin-top:10px"><button class="btn" id="btn-reset-send">코드 보내기</button></div>
+      <div id="reset-step2" class="hidden">
+        <label for="reset-code">메일로 온 8자리 코드</label>
+        <input id="reset-code" inputmode="numeric" autocomplete="one-time-code">
+        <label for="reset-pw">새 비밀번호 (6자 이상)</label>
+        <input id="reset-pw" type="password" autocomplete="new-password">
+        <div class="row" style="margin-top:10px"><button class="btn primary" id="btn-reset-apply">비밀번호 바꾸기</button></div>
+      </div>
+      <div id="reset-msg"></div>
+      <p class="faint" style="margin:14px 0 0"><a href="#" id="btn-reset-back">로그인으로 돌아가기</a></p>
     </section>
 
     <!-- 로그인 뒤 -->

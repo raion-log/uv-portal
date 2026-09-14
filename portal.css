@@ -90,6 +90,8 @@ code{
 .btn.small{padding:5px 11px;font-size:.8rem}
 .btn:disabled{opacity:.45;cursor:not-allowed}
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.row.nowrap{flex-wrap:nowrap}
+.row.nowrap input{flex:1;min-width:0}
 
 /* ── 입력 ─────────────────────────────────────────── */
 label{display:block;font-size:.78rem;color:var(--sub);margin:10px 0 4px;font-weight:700;letter-spacing:.04em}
