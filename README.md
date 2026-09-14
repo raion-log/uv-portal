@@ -12,7 +12,7 @@
 | 파일 | 무엇 |
 |---|---|
 | `index.html` · `portal.js` · `portal.css` | 화면. supabase-js(anon 키)로 로그인·조회 |
-| `portal-logic.mjs` | 순수 계산(역할·자격·최신 판·표기) — `node --test tests/` |
+| `portal-logic.mjs` | 순수 계산(역할·자격·최신 판·표기) — `node --test tests/portal-logic.test.mjs`(이 Node 에서는 폴더 인자가 실패) |
 | `sql/portal.sql` | 표 3개(`uvengers_programs`·`uvengers_releases`·`uvengers_program_members`), 판정 함수, RLS, 첫 데이터 |
 
 보호는 서버 RLS 가 한다. 관리자 판정은 raion-admin 이 쓰는 `private.is_admin()` 그대로, 편집기 수강생 자격은 앱 관문이 보는
