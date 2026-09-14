@@ -75,9 +75,9 @@
             </div>
             <label>SHA-256</label><input id="rel-sha" placeholder="64자리">
             <label>다운로드 링크</label><input id="rel-url" placeholder="https://github.com/…/releases/download/…">
-            <label>바뀐 점(두 줄 정도 — 수강생 카드에 그대로 보입니다)</label><textarea id="rel-notes-text" rows="3" placeholder="첫 줄: 가장 큰 변화&#10;둘째 줄: 그다음 변화"></textarea>
+            <label>바뀐 점(줄마다 한 항목 — 수강생 카드에 목록으로 보입니다)</label><textarea id="rel-notes-text" rows="4" placeholder="가장 큰 변화&#10;그다음 변화&#10;또 하나"></textarea>
             <label>릴리스 노트 링크(선택)</label><input id="rel-notes" placeholder="https://github.com/…/releases/tag/…">
-            <label><input type="checkbox" id="rel-pre" checked style="width:auto"> 후보(RC)</label>
+            <label><input type="checkbox" id="rel-pre" checked style="width:auto"> RC(시험판) — 카드에는 「최신」으로 보이고 판 이름 뒤에 RC 번호가 붙습니다</label>
             <div class="row" style="margin-top:10px"><button class="btn primary" id="btn-rel-save">등록</button></div>
             <div id="rel-msg"></div>
           </div>

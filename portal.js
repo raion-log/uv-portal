@@ -1,5 +1,5 @@
 // UV 포털 — 로그인 뒤 역할별 화면. 데이터 보호는 서버 RLS(sql/portal.sql)가 한다; 여기는 받은 만큼만 그린다.
-import { roleOf, visiblePrograms, latestRelease, pickRelease, fmtBytes, validUntilLabel, releaseFormErrors,
+import { roleOf, visiblePrograms, latestRelease, pickRelease, notesLines, fmtBytes, validUntilLabel, releaseFormErrors,
   focusPrograms, focusFromLocation } from './portal-logic.mjs';
 
 // ★프로그램 전용 링크 — `?p=uv-global-reaction-editor`(또는 `#…`)로 들어오면 그 프로그램 하나만 보인다. 허브로 가는 단추는 없다.
@@ -76,9 +76,12 @@ function render() {
   $('mine-empty').classList.toggle('hidden', !!FOCUS || mine.length > 0);
   // ★프로그램 하나 = 카드 하나, 받을 것도 하나. 가장 새 판(후보 포함)을 내밀고 바뀐 점 두 줄을 붙인다. 나머지 판과 확인값(SHA)은 접는다.
   //   (사용자 2026-09-14 「같은 프로그램은 하나로 합쳐서… 뭘 받아야하는지 모르겠음」 「바뀐 점도 2줄 정도는 써줘」)
+  // 배지: 내미는 판은 늘 「최신」, 판 이름에 RC 가 붙으면 그걸로 충분하다(사용자 2026-09-14 「뱃지도 왠 후보로 들어가있어?」). 지난 판은 정식/RC.
   const kindOf = (r) => (r.is_prerelease ? 'rc' : 'stable');
+  const kindName = (r) => (r.is_prerelease ? 'RC' : '정식');
   const label = (r) => `${esc(r.version)}${r.is_prerelease ? ' ' + esc(r.tag.replace(/^v[\d.]+-rc\./, 'RC')) : ''}`;
-  const histItem = (r) => `<li><span class="badge ${kindOf(r)}">${r.is_prerelease ? '후보' : '정식'}</span> ${label(r)} · ${esc(String(r.published_at).slice(0, 10))} · ${esc(fmtBytes(r.bytes))} · <a href="${esc(r.download_url)}">받기</a></li>`;
+  const notesList = (r, cls = 'notes') => { const ls = notesLines(r.notes); return ls.length ? `<ul class="${cls}">${ls.map((l) => `<li>${esc(l)}</li>`).join('')}</ul>` : ''; };
+  const histItem = (r) => `<li><span class="badge ${kindOf(r)}">${kindName(r)}</span> ${label(r)} · ${esc(String(r.published_at).slice(0, 10))} · ${esc(fmtBytes(r.bytes))} · <a href="${esc(r.download_url)}">받기</a></li>`;
   for (const p of mine) {
     const { pick, others } = pickRelease(p.uvengers_releases);
     const m = (me.memberships || []).find((x) => x.program_code === p.code);
@@ -87,8 +90,8 @@ function render() {
       <h3>${esc(p.name)}</h3>
       <p class="tagline">${esc(p.tagline || '')}</p>
       ${pick ? `
-      <div class="ver"><span class="badge ${kindOf(pick)}">${pick.is_prerelease ? '후보' : '정식'}</span><b>${label(pick)}</b><span class="faint">${esc(String(pick.published_at).slice(0, 10))}</span></div>
-      ${pick.notes ? `<p class="notes">${esc(pick.notes)}</p>` : ''}
+      <div class="ver"><span class="badge latest">최신</span><b>${label(pick)}</b><span class="faint">${esc(String(pick.published_at).slice(0, 10))}</span></div>
+      ${notesList(pick)}
       <div class="meta">
         <span class="k">파일</span><code>${esc(pick.file_name)}</code>
         <span class="k">크기</span><span>${esc(fmtBytes(pick.bytes))}</span>
@@ -127,8 +130,8 @@ function renderAdmin() {
     .sort((a, b) => new Date(b.published_at) - new Date(a.published_at));
   $('admin-releases').innerHTML = `<thead><tr><th>게시일</th><th>프로그램</th><th>판</th><th>종류</th><th>바뀐 점</th><th>파일 · 크기</th><th>SHA-256</th><th></th></tr></thead><tbody>${hist.map((r) => `<tr>
       <td class="nw">${esc(String(r.published_at).slice(0, 10))}</td><td><b>${esc(r.program)}</b></td><td class="nw">${esc(r.version)} <code>${esc(r.tag)}</code></td>
-      <td><span class="badge ${r.is_prerelease ? 'rc' : 'stable'}">${r.is_prerelease ? '후보' : '정식'}</span></td>
-      <td class="notes-cell">${r.notes ? esc(r.notes) : '<span class="faint">없음</span>'}</td>
+      <td><span class="badge ${r.is_prerelease ? 'rc' : 'stable'}">${r.is_prerelease ? 'RC' : '정식'}</span></td>
+      <td class="notes-cell">${notesLines(r.notes).length ? `<ul class="notes">${notesLines(r.notes).map((l) => `<li>${esc(l)}</li>`).join('')}</ul>` : '<span class="faint">없음</span>'}</td>
       <td><code>${esc(r.file_name)}</code><br><span class="faint">${esc(fmtBytes(r.bytes))}</span></td><td><code>${esc(String(r.sha256 || '').slice(0, 12))}…</code></td>
       <td class="nw"><a href="${esc(r.download_url)}">받기</a>${r.notes_url ? ` · <a href="${esc(r.notes_url)}" target="_blank" rel="noopener">노트</a>` : ''}</td>
     </tr>`).join('') || '<tr><td colspan="8" class="faint">아직 등록된 판이 없습니다</td></tr>'}</tbody>`;

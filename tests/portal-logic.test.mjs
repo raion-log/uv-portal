@@ -121,3 +121,9 @@ test('바뀐 점은 비워도 되고 240자 안이어야 한다', () => {
   assert.deepEqual(releaseFormErrors({ ...OK_FORM, notes: '' }), []);
   assert.deepEqual(releaseFormErrors({ ...OK_FORM, notes: 'x'.repeat(241) }), ['바뀐 점은 240자 안으로 줄여 주세요']);
 });
+
+test('바뀐 점은 줄마다 한 항목 — 앞의 - · • 는 떼고 빈 줄은 버린다', async () => {
+  const { notesLines } = await import('../portal-logic.mjs');
+  assert.deepEqual(notesLines('- AI 응답이 멈춰도 전체가 멈추지 않음\n• 발음 사전\n\n  나레이션 분량 ↑  '), ['AI 응답이 멈춰도 전체가 멈추지 않음', '발음 사전', '나레이션 분량 ↑']);
+  assert.deepEqual(notesLines(null), []);
+});

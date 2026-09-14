@@ -49,11 +49,15 @@ main{max-width:1040px;margin:0 auto;padding:24px 24px 96px}
 .prog .tagline{font-size:.92rem;margin-bottom:14px}
 .ver{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:0 0 8px}
 .ver b{color:#fff;font-size:1.15rem}
-.notes{white-space:pre-line;color:var(--tx2);font-size:.9rem;line-height:1.6;margin:0 0 12px;padding-left:12px;border-left:2px solid var(--line2)}
+ul.notes{margin:0 0 12px;padding-left:18px;color:var(--tx2);font-size:.9rem;line-height:1.6}
+ul.notes li{margin:2px 0}
+ul.notes li::marker{color:var(--ac)}
+.badge.latest{border-color:var(--ac2);color:#fff;background:rgba(91,118,247,.35)}
 .meta{display:grid;grid-template-columns:64px 1fr;gap:3px 10px;font-size:.84rem;margin:6px 0 12px;color:var(--tx2)}
 .meta .k{color:var(--sub)}
 .prog .dl{flex:1 1 100%}
-td.notes-cell{white-space:pre-line;min-width:220px;font-size:.84rem}
+td.notes-cell{min-width:220px}
+td.notes-cell ul.notes{margin:0;padding-left:16px;font-size:.84rem}
 code{
   font-family:Consolas,"D2Coding",monospace;font-size:.9em;color:#9fb0d8;
   background:rgba(255,255,255,.05);padding:1px 6px;border-radius:5px;word-break:break-all;

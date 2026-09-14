@@ -142,9 +142,10 @@ values ('uv-global-reaction-editor', '1.3.3', 'v1.3.3-rc.6', 'UV-Global-Reaction
 on conflict (program_code, tag) do nothing;
 
 -- 첫 두 판의 바뀐 점(CHANGELOG 요약). 비어 있을 때만 채운다 — 관리자가 고친 글을 덮지 않는다.
-update public.uvengers_releases set notes = E'AI 응답이 멈춰도 전체가 멈추지 않고, 자료 화면이 이야기와 맞습니다(다른 나라 이야기에 한국 화면이 오지 않음).\n나레이션 분량이 레퍼런스 수준으로, 일본어·번체 발음 사전, 설정에 「내 계정」 탭, 진행 화면 썸네일 후보가 오른쪽 열에.'
+-- 줄마다 한 항목(카드에 목록으로 보인다).
+update public.uvengers_releases set notes = E'AI 응답이 멈춰도 전체가 멈추지 않음\n다른 나라 이야기에 한국 자료 화면이 오지 않음\n나레이션 분량 레퍼런스 수준, 일본어·번체 발음 사전\n설정 「내 계정」 탭, 진행 화면 썸네일 후보 오른쪽 열'
  where program_code = 'uv-global-reaction-editor' and tag = 'v1.3.3-rc.6' and notes is null;
-update public.uvengers_releases set notes = E'자막이 막혀도 소리로 직접 재서 분량을 정하고, 원본 소리에서 음악·효과음을 빼 목소리만 남깁니다.\n나레이션이 레퍼런스만큼(분당 140자) 들어갑니다.'
+update public.uvengers_releases set notes = E'자막이 막혀도 소리로 직접 재서 분량을 정함\n원본 소리에서 음악·효과음을 빼고 목소리만\n나레이션 분당 90자 → 140자'
  where program_code = 'uv-global-reaction-editor' and tag = 'v1.3.0' and notes is null;
 
 commit;

@@ -77,6 +77,11 @@ export function releaseFormErrors(f) {
   return e;
 }
 
+/** 바뀐 점 글 → 항목 배열. 줄마다 하나, 앞의 - · • 는 떼고 빈 줄은 버린다(사용자 2026-09-14 「서술형 말고 리스트로」). */
+export function notesLines(notes) {
+  return String(notes || '').split(/\r?\n/).map((l) => l.replace(/^\s*[-•·*]\s*/, '').trim()).filter(Boolean);
+}
+
 /** 카드가 내미는 판 하나(가장 새 것, 후보 포함)와 나머지(새 것부터). 받을 것이 하나여야 헷갈리지 않는다(사용자 2026-09-14). */
 export function pickRelease(releases) {
   const { history } = releaseLines(releases);
