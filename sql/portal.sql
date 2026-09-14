@@ -69,24 +69,26 @@ returns boolean language sql stable security definer set search_path = public, p
   select coalesce(private.is_admin(), false);
 $$;
 
--- 로그인한 사람의 기수(둘 다 본다: 관리 표의 batch, 편집기 표의 cohort)
+-- 로그인한 사람의 기수 — 관리 표(uvengers_members.batch, 관리자만 쓴다)만 본다.
+-- ★편집기 표의 cohort 는 가입 때 본인이 고르는 값이라 자격 근거로 쓰지 않는다(적대평가 2026-09-14: 미승인 가입자가 기수를
+--   골라 다른 프로그램을 열 수 있었다). 상태도 활동 중인 회원만.
 create or replace function public.portal_my_cohorts()
 returns setof text language sql stable security definer set search_path = public, private as $$
   select m.batch from public.uvengers_members m
-   where m.email = (auth.jwt() ->> 'email') and m.batch is not null
-  union
-  select e.cohort from public.uvengers_editor_members e
-   where e.id = auth.uid() and e.cohort is not null;
+   where lower(m.email) = lower(auth.jwt() ->> 'email')
+     and m.batch is not null
+     and lower(coalesce(m.status, '')) in ('active', 'approved');
 $$;
 
 create or replace function public.portal_can_see(p_code text)
 returns boolean language sql stable security definer set search_path = public, private as $$
   select public.portal_is_admin()
+      -- 편집기: 앱 관문(uvengers_editor_access_check)과 같은 판정 — valid_until 이 NULL 이면 미승인이다
       or (p_code = 'uv-global-reaction-editor' and exists (
             select 1 from public.uvengers_editor_members e
              where e.id = auth.uid()
                and lower(coalesce(e.status, '')) in ('approved', 'active')
-               and (e.valid_until is null or e.valid_until >= now())))
+               and e.valid_until is not null and e.valid_until >= now()))
       or exists (
             select 1 from public.uvengers_program_members m
              where m.user_id = auth.uid() and m.program_code = p_code
@@ -181,7 +183,8 @@ create policy program_cohorts_admin on public.uvengers_program_cohorts for all t
 
 grant select, insert, update, delete on public.uvengers_programs, public.uvengers_releases, public.uvengers_program_members,
   public.uvengers_cohorts, public.uvengers_program_cohorts to authenticated;
-grant usage, select on all sequences in schema public to authenticated;
+-- 포털 표의 id 시퀀스만(public 전체 시퀀스에 주면 다른 제품 표까지 열린다 — 적대평가 2026-09-14)
+grant usage, select on sequence public.uvengers_releases_id_seq, public.uvengers_program_members_id_seq to authenticated;
 -- anon 은 표를 만질 이유가 없다. RLS 정책이 authenticated 전용이라 0행이긴 하지만(실측 200 []), 기본 권한으로 받은 표 권한은 회수한다(적대평가 2026-09-14).
 revoke all on public.uvengers_programs, public.uvengers_releases, public.uvengers_program_members,
   public.uvengers_cohorts, public.uvengers_program_cohorts from anon;
@@ -192,7 +195,7 @@ values ('uv-global-reaction-editor', 'UV 글로벌 반응 편집기',
         'YouTube 반응 영상을 국가별 자긍심 콘텐츠로 재구성하는 Windows 편집기',
         'https://raion-log.github.io/uv-global-reaction-editor-releases/',
         'https://raion-log.github.io/uv-global-reaction-editor-releases/', 10)
-on conflict (code) do update set name = excluded.name, tagline = excluded.tagline;
+on conflict (code) do nothing;   -- 관리자가 고친 이름·소개를 재적용이 되돌리지 않는다(적대평가 2026-09-14)
 
 insert into public.uvengers_releases (program_code, version, tag, file_name, bytes, sha256, download_url, notes_url, published_at, is_prerelease)
 values ('uv-global-reaction-editor', '1.3.3', 'v1.3.3-rc.6', 'UV-Global-Reaction-Editor_1.3.3_x64-setup.exe', 670338555,
@@ -243,13 +246,16 @@ insert into public.uvengers_cohorts (name, sort)
 values ('빈이파파 1기', 10), ('빈이파파 2기', 20), ('빈이파파 3기', 30), ('라이온 1기', 40), ('애삼이 1기', 50),
        ('유벤져스 1기', 60), ('유벤져스 2기', 70), ('유유스 1기', 80)
 on conflict (name) do nothing;
+-- ★표가 비어 있을 때만(처음 켤 때만) 넣는다 — 관리자가 화면에서 끈 칸을 재적용이 되살리면 안 된다(적대평가 2026-09-14).
 insert into public.uvengers_program_cohorts (program_code, cohort)
-values ('flow', '빈이파파 1기'), ('flow', '빈이파파 2기'), ('flow', '라이온 1기'), ('flow', '애삼이 1기'),
+select v.program_code, v.cohort from (values
+       ('flow', '빈이파파 1기'), ('flow', '빈이파파 2기'), ('flow', '라이온 1기'), ('flow', '애삼이 1기'),
        ('genspark', '빈이파파 1기'), ('genspark', '빈이파파 2기'), ('genspark', '라이온 1기'), ('genspark', '애삼이 1기'),
        ('grok', '빈이파파 1기'), ('grok', '빈이파파 2기'), ('grok', '라이온 1기'), ('grok', '애삼이 1기'),
        ('vrewauto-classic', '빈이파파 2기'),
        ('vrewauto-new', '빈이파파 3기'),
-       ('uv-global-reaction-editor', '유유스 1기')
+       ('uv-global-reaction-editor', '유유스 1기')) as v(program_code, cohort)
+ where not exists (select 1 from public.uvengers_program_cohorts)
 on conflict do nothing;
 
 -- 줄마다 한 항목(카드에 목록으로 보인다).

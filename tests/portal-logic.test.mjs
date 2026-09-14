@@ -147,3 +147,51 @@ test('구글 로그인 뒤 주소에서 ?p= 가 사라져도 기억해 둔 전�
   assert.equal(focusFromLocation({ search: '', hash: '' }, 'Bad Code!'), '');                // 기억한 것도 모양 검사
   assert.equal(focusFromLocation({ search: '', hash: '' }), '');
 });
+
+// ── 적대평가(2026-09-14) 뒤 — 검토자가 짚은 반대 사례들 ──
+test('구글 로그인이 #access_token=… 을 달고 돌아와도 기억한 전용 링크 코드를 쓴다(암묵 흐름)', () => {
+  assert.equal(focusFromLocation({ search: '', hash: '#access_token=abc&refresh_token=def' }, 'flow'), 'flow');
+  assert.equal(focusFromLocation({ search: '', hash: '#access_token=abc' }), '');
+});
+
+test('게시일은 한국 날짜로 — UTC 로 온 timestamptz 가 하루 앞서 찍히면 안 된다', async () => {
+  const { fmtDate } = await import('../portal-logic.mjs');
+  assert.equal(fmtDate('2026-09-08T16:09:46+00:00'), '2026-09-09');     // 1.3.0 은 9월 9일 01:09 KST 에 나갔다
+  assert.equal(fmtDate('2026-09-13T00:00:00+09:00'), '2026-09-13');
+  assert.equal(fmtDate(null), '');
+});
+
+test('같은 게시일이면 나중에 등록한 판(id 큰 것)이 최신이다', () => {
+  const rel = [
+    { id: 1, version: '1.3.3', tag: 'v1.3.3-rc.6', published_at: '2026-09-13T00:00:00+09:00', is_prerelease: true },
+    { id: 2, version: '1.3.3', tag: 'v1.3.3-rc.7', published_at: '2026-09-13T00:00:00+09:00', is_prerelease: true },
+  ];
+  assert.equal(latestRelease(rel).tag, 'v1.3.3-rc.7');
+  assert.equal(latestRelease([rel[1], rel[0]]).tag, 'v1.3.3-rc.7');
+});
+
+test('판 이름은 RC 번호가 있을 때만 붙인다 — 태그가 v2.1.2 인 시험판에 태그를 통째로 붙이지 않는다', async () => {
+  const { versionLabel } = await import('../portal-logic.mjs');
+  assert.equal(versionLabel({ version: '1.3.3', tag: 'v1.3.3-rc.6', is_prerelease: true }), '1.3.3 RC6');
+  assert.equal(versionLabel({ version: '2.1.2', tag: 'v2.1.2', is_prerelease: true }), '2.1.2');
+  assert.equal(versionLabel({ version: '1.3.0', tag: 'v1.3.0', is_prerelease: false }), '1.3.0');
+});
+
+test('판 등록 폼은 zip·msi·dmg 도 받고, 노트 링크는 https 여야 한다', () => {
+  assert.deepEqual(releaseFormErrors({ ...OK_FORM, file_name: 'raion-flow-pro-v1.2.3.zip' }), []);
+  assert.deepEqual(releaseFormErrors({ ...OK_FORM, file_name: 'x.txt' }), ['파일 이름은 exe·zip·msi·dmg 로 끝나야 합니다']);
+  assert.deepEqual(releaseFormErrors({ ...OK_FORM, notes_url: 'javascript:alert(1)' }), ['릴리스 노트 링크는 https:// 로 시작해야 합니다']);
+  assert.deepEqual(releaseFormErrors({ ...OK_FORM, notes_url: '' }), []);
+});
+
+test('카드의 자격 줄은 살아 있는 자격을 고른다 — 만료된 member 행이 앞에 있어도 기수 자격이 있으면 그것', async () => {
+  const { pickMembership } = await import('../portal-logic.mjs');
+  const ms = [
+    { program_code: 'flow', status: 'approved', valid_until: '2026-01-01T00:00:00+09:00', via: 'member', cohort: null },
+    { program_code: 'flow', status: 'approved', valid_until: null, via: 'cohort', cohort: '빈이파파 1기' },
+  ];
+  assert.equal(pickMembership(ms, 'flow', NOW).via, 'cohort');
+  assert.equal(pickMembership(ms, 'grok', NOW), null);
+  // 편집기 회원의 valid_until NULL 은 앱과 같이 「미승인」 — 살아 있는 자격이 아니다
+  assert.equal(membershipAlive({ status: 'approved', valid_until: null, via: 'editor' }, NOW), false);
+});

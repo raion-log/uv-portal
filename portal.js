@@ -1,14 +1,15 @@
 // UV 포털 — 로그인 뒤 역할별 화면. 데이터 보호는 서버 RLS(sql/portal.sql)가 한다; 여기는 받은 만큼만 그린다.
-import { roleOf, visiblePrograms, latestRelease, pickRelease, notesLines, cohortMatrix, fmtBytes, validUntilLabel, releaseFormErrors,
-  focusPrograms, focusFromLocation } from './portal-logic.mjs';
+import { roleOf, visiblePrograms, latestRelease, pickRelease, notesLines, cohortMatrix, fmtBytes, fmtDate, versionLabel, pickMembership,
+  validUntilLabel, releaseFormErrors, focusPrograms, focusFromLocation } from './portal-logic.mjs';
 
 // ★프로그램 전용 링크 — `?p=uv-global-reaction-editor`(또는 `#…`)로 들어오면 그 프로그램 하나만 보인다. 허브로 가는 단추는 없다.
 //   (사용자 2026-09-14: 「그 링크가 독립적으로만 작동하면 돼. 별도 허브로 안 넘어오고 그 프로그램만 볼 수 있게」)
-//   구글 로그인은 주소를 갈아 끼우며 돌아오므로(?p= 가 사라진다) 누르기 전에 코드를 기억해 두고, 돌아온 뒤 그 값으로 잇는다.
+//   구글 로그인은 주소를 갈아 끼우며 돌아오므로(?p= 가 사라진다) 누르기 전에 코드를 기억해 두고, 돌아온 길에서만 그 값으로 잇는다.
+//   기억한 값은 한 번 쓰고 지운다 — 같은 탭에서 포털 주소를 새로 쳤을 때 달라붙지 않게(적대평가 2026-09-14).
 const FOCUS_KEY = 'uv-portal-focus';
-const remembered = (() => { try { return sessionStorage.getItem(FOCUS_KEY) || ''; } catch { return ''; } })();
+const RETURNING = /access_token=|[?&]code=/.test(location.hash + location.search);   // 암묵 흐름 #access_token= / PKCE ?code=
+const remembered = (() => { try { const v = RETURNING ? (sessionStorage.getItem(FOCUS_KEY) || '') : ''; sessionStorage.removeItem(FOCUS_KEY); return v; } catch { return ''; } })();
 const FOCUS = focusFromLocation(location, remembered);
-if (FOCUS && !location.search.includes('p=')) { try { history.replaceState(null, '', location.pathname + '?p=' + FOCUS); } catch {} }
 
 // 공개 anon 키 — raion-admin·앱과 같은 프로젝트. 브라우저에 두라고 만든 키다(권한은 RLS 가 정한다).
 const SUPABASE_URL = 'https://dnflcjpjzqmrybtcleqy.supabase.co';
@@ -30,17 +31,25 @@ $('btn-google').addEventListener('click', async () => {
   const { error } = await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.origin + location.pathname } });
   if (error) msg('login-msg', '구글 로그인을 열지 못했습니다: ' + error.message);
 });
-$('btn-email').addEventListener('click', async () => {
+// 단추 연타 막기 — 도는 동안 잠그고 끝나면 푼다(적대평가 2026-09-14)
+const busy = async (btn, fn) => { if (btn.disabled) return; btn.disabled = true; try { await fn(); } finally { btn.disabled = false; } };
+$('btn-email').addEventListener('click', () => busy($('btn-email'), async () => {
   msg('login-msg', '');
   const { error } = await sb.auth.signInWithPassword({ email: $('login-email').value.trim(), password: $('login-pw').value });
   if (error) msg('login-msg', '로그인하지 못했습니다. 이메일과 비밀번호를 확인해 주세요.');
-});
+}));
 $('login-pw').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('btn-email').click(); });
 $('btn-logout').addEventListener('click', async () => { await sb.auth.signOut(); location.reload(); });
 
-sb.auth.onAuthStateChange((_event, session) => { if (session) enter(session); else leave(); });
+// ★enter 는 사람마다 한 번 — INITIAL_SESSION·SIGNED_IN·TOKEN_REFRESHED 가 같은 세션을 거듭 넘겨도 화면(폼·표)을 다시 지우지 않는다
+let entered = '';
+sb.auth.onAuthStateChange((_event, session) => {
+  if (!session) { entered = ''; leave(); return; }
+  if (session.user?.id && session.user.id === entered) return;
+  enter(session);
+});
 const { data: { session } } = await sb.auth.getSession();
-if (session) enter(session); else leave();
+if (session) { if (session.user?.id !== entered) enter(session); } else leave();
 
 function leave() {
   $('view-login').classList.remove('hidden'); $('view-app').classList.add('hidden');
@@ -48,9 +57,13 @@ function leave() {
 }
 
 async function enter(session) {
+  entered = session.user?.id || 'x';
   $('view-login').classList.add('hidden'); $('view-app').classList.remove('hidden'); $('btn-logout').classList.remove('hidden');
+  // 로그인이 끝난 뒤에야 주소를 정리한다 — 그 전에 hash 를 지우면 supabase 가 토큰을 못 읽는다
+  if (FOCUS && !/[?&]p=/.test(location.search)) { try { history.replaceState(null, '', location.pathname + '?p=' + FOCUS); } catch {} }
   const { data, error } = await sb.rpc('portal_me');
   me = error ? { is_admin: false, memberships: [], email: session.user?.email } : data;
+  msg('load-msg', error ? '계정 정보를 못 읽었습니다: ' + error.message + ' — 새로고침해 보세요' : '');
   $('who').textContent = `${me.email || session.user?.email || ''}${roleOf(me) === 'admin' ? ' · 관리자' : ''}`;
   $('tab-admin').classList.toggle('hidden', roleOf(me) !== 'admin');
   await load();
@@ -59,10 +72,11 @@ async function enter(session) {
 
 async function load() {
   const { data, error } = await sb.from('uvengers_programs')
-    .select('code,name,tagline,guide_url,landing_url,sort,active,uvengers_releases(version,tag,file_name,bytes,sha256,download_url,notes,notes_url,published_at,is_prerelease)')
+    .select('code,name,tagline,guide_url,landing_url,sort,active,uvengers_releases(id,version,tag,file_name,bytes,sha256,download_url,notes,notes_url,published_at,is_prerelease)')
     .order('sort');
   programs = error ? [] : (data || []);
-  if (error) console.error('프로그램을 못 읽었습니다', error);
+  // ★서버 오류를 「열린 프로그램이 없습니다」로 둔갑시키지 않는다(적대평가 2026-09-14)
+  if (error) msg('load-msg', '프로그램 목록을 못 읽었습니다: ' + error.message + ' — 새로고침해 보세요');
   if (roleOf(me) === 'admin') {
     const c = await sb.rpc('portal_cohorts');
     cohorts = c.error ? [] : (c.data || []);
@@ -75,7 +89,7 @@ async function load() {
 // ── 탭 ──────────────────────────────────────────────────────────────────────
 $('tabs').addEventListener('click', (e) => {
   const b = e.target.closest('[data-tab]'); if (!b) return;
-  for (const x of $('tabs').querySelectorAll('[data-tab]')) x.classList.toggle('on', x === b);
+  for (const x of $('tabs').querySelectorAll('[data-tab]')) { x.classList.toggle('on', x === b); x.setAttribute('aria-selected', x === b ? 'true' : 'false'); }
   $('pane-mine').classList.toggle('hidden', b.dataset.tab !== 'mine');
   $('pane-admin').classList.toggle('hidden', b.dataset.tab !== 'admin');
 });
@@ -93,18 +107,23 @@ function render() {
   // 배지: 내미는 판은 늘 「최신」, 판 이름에 RC 가 붙으면 그걸로 충분하다(사용자 2026-09-14 「뱃지도 왠 후보로 들어가있어?」). 지난 판은 정식/RC.
   const kindOf = (r) => (r.is_prerelease ? 'rc' : 'stable');
   const kindName = (r) => (r.is_prerelease ? 'RC' : '정식');
-  const label = (r) => `${esc(r.version)}${r.is_prerelease ? ' ' + esc(r.tag.replace(/^v[\d.]+-rc\./, 'RC')) : ''}`;
+  const label = (r) => esc(versionLabel(r));
   const notesList = (r, cls = 'notes') => { const ls = notesLines(r.notes); return ls.length ? `<ul class="${cls}">${ls.map((l) => `<li>${esc(l)}</li>`).join('')}</ul>` : ''; };
-  const histItem = (r) => `<li><span class="badge ${kindOf(r)}">${kindName(r)}</span> ${label(r)} · ${esc(String(r.published_at).slice(0, 10))} · ${esc(fmtBytes(r.bytes))} · <a href="${esc(r.download_url)}">받기</a></li>`;
+  const histItem = (r) => `<li><span class="badge ${kindOf(r)}">${kindName(r)}</span> ${label(r)} · ${esc(fmtDate(r.published_at))} · ${esc(fmtBytes(r.bytes))} · <a href="${esc(r.download_url)}">받기</a></li>`;
+  // 자격 줄: 관리자(자격 없음) → 「관리자」, 기수 자격 → 「○○ 기수 · 기한 없음」, 편집기인데 기한이 없으면 「승인 대기」, 나머지는 기한
+  const untilLabel = (m) => (roleOf(me) === 'admin' && !m) ? '관리자'
+    : m?.via === 'cohort' ? `${m.cohort} 기수 · 기한 없음`
+    : (m?.via === 'editor' && !m.valid_until) ? '승인 대기'
+    : validUntilLabel(m?.valid_until);
   for (const p of mine) {
     const { pick, others } = pickRelease(p.uvengers_releases);
-    const m = (me.memberships || []).find((x) => x.program_code === p.code);
+    const m = pickMembership(me.memberships, p.code);
     const card = document.createElement('div'); card.className = 'prog';
     card.innerHTML = `
       <h3>${esc(p.name)}</h3>
       <p class="tagline">${esc(p.tagline || '')}</p>
       ${pick ? `
-      <div class="ver"><span class="badge latest">최신</span><b>${label(pick)}</b><span class="faint">${esc(String(pick.published_at).slice(0, 10))}</span></div>
+      <div class="ver"><span class="badge latest">최신</span><b>${label(pick)}</b><span class="faint">${esc(fmtDate(pick.published_at))}</span></div>
       ${notesList(pick)}
       <div class="meta">
         <span class="k">파일</span><code>${esc(pick.file_name)}</code>
@@ -115,7 +134,7 @@ function render() {
         ${p.guide_url ? `<a class="btn small" href="${esc(p.guide_url)}" target="_blank" rel="noopener">설치 안내</a>` : ''}
         ${pick.notes_url ? `<a class="btn small" href="${esc(pick.notes_url)}" target="_blank" rel="noopener">바뀐 점 전체</a>` : ''}
       </div>` : '<div class="faint">아직 배포된 판이 없습니다</div>'}
-      <div class="meta"><span class="k">이용 기한</span><span>${esc(roleOf(me) === 'admin' && !m ? '관리자' : m?.via === 'cohort' ? `${m.cohort} 기수 · 기한 없음` : validUntilLabel(m?.valid_until))}</span></div>
+      <div class="meta"><span class="k">이용 기한</span><span>${esc(untilLabel(m))}</span></div>
       ${pick ? `<details class="hist"><summary>확인값${others.length ? ` · 지난 판 ${others.length}개` : ''}</summary>
         <div class="faint">SHA-256 <code>${esc(pick.sha256)}</code></div>
         ${others.length ? `<ul>${others.map(histItem).join('')}</ul>` : ''}</details>` : ''}`;
@@ -132,7 +151,7 @@ function renderAdmin() {
     const stable = latestRelease(p.uvengers_releases, { includePrerelease: false });
     return `<tr>
       <td><b>${esc(p.name)}</b><br><code>${esc(p.code)}</code>${p.active === false ? ' <span class="badge">은퇴</span>' : ''}</td>
-      <td>${rel ? `${esc(rel.version)} <span class="badge ${rel.is_prerelease ? 'rc' : 'stable'}">${esc(rel.tag)}</span><br><span class="faint">${esc(String(rel.published_at).slice(0, 10))} · ${esc(fmtBytes(rel.bytes))}</span>` : '<span class="faint">없음</span>'}</td>
+      <td>${rel ? `${esc(rel.version)} <span class="badge ${rel.is_prerelease ? 'rc' : 'stable'}">${esc(rel.tag)}</span><br><span class="faint">${esc(fmtDate(rel.published_at))} · ${esc(fmtBytes(rel.bytes))}</span>` : '<span class="faint">없음</span>'}</td>
       <td>${stable ? `${esc(stable.version)} <span class="faint">${esc(stable.tag)}</span>` : '<span class="faint">없음</span>'}</td>
       <td>${rel ? `<code>${esc(rel.sha256.slice(0, 12))}…</code><br><a href="${esc(rel.download_url)}">받기</a>` : ''}</td>
       <td>${(p.uvengers_releases || []).length}개</td>
@@ -141,9 +160,9 @@ function renderAdmin() {
   t.innerHTML = `<thead><tr><th>프로그램</th><th>최신 판</th><th>정식 판</th><th>파일</th><th>판 수</th></tr></thead><tbody>${rows.join('')}</tbody>`;
   // 배포 기록 — 프로그램 가리지 않고 전부, 새 것부터
   const hist = programs.flatMap((p) => (p.uvengers_releases || []).map((r) => ({ ...r, program: p.name })))
-    .sort((a, b) => new Date(b.published_at) - new Date(a.published_at));
+    .sort((a, b) => (new Date(b.published_at) - new Date(a.published_at)) || ((Number(b.id) || 0) - (Number(a.id) || 0)));
   $('admin-releases').innerHTML = `<thead><tr><th>게시일</th><th>프로그램</th><th>판</th><th>종류</th><th>바뀐 점</th><th>파일 · 크기</th><th>SHA-256</th><th></th></tr></thead><tbody>${hist.map((r) => `<tr>
-      <td class="nw">${esc(String(r.published_at).slice(0, 10))}</td><td><b>${esc(r.program)}</b></td><td class="nw">${esc(r.version)} <code>${esc(r.tag)}</code></td>
+      <td class="nw">${esc(fmtDate(r.published_at))}</td><td><b>${esc(r.program)}</b></td><td class="nw">${esc(r.version)} <code>${esc(r.tag)}</code></td>
       <td><span class="badge ${r.is_prerelease ? 'rc' : 'stable'}">${r.is_prerelease ? 'RC' : '정식'}</span></td>
       <td class="notes-cell">${notesLines(r.notes).length ? `<ul class="notes">${notesLines(r.notes).map((l) => `<li>${esc(l)}</li>`).join('')}</ul>` : '<span class="faint">없음</span>'}</td>
       <td><code>${esc(r.file_name)}</code><br><span class="faint">${esc(fmtBytes(r.bytes))}</span></td><td><code>${esc(String(r.sha256 || '').slice(0, 12))}…</code></td>
@@ -168,17 +187,20 @@ function renderMatrix() {
 $('cohort-matrix').addEventListener('change', async (e) => {
   const box = e.target.closest('input[type=checkbox][data-code]'); if (!box) return;
   const row = { program_code: box.dataset.code, cohort: box.dataset.cohort };
-  box.disabled = true;
+  // 저장하는 동안 표 전체를 잠근다 — 두 칸을 연달아 누르면 먼저 온 답의 재렌더가 뒤 칸을 되돌리던 것(적대평가 2026-09-14)
+  const t = $('cohort-matrix'); t.classList.add('saving');
   const { error } = box.checked
     ? await sb.from('uvengers_program_cohorts').insert(row)
     : await sb.from('uvengers_program_cohorts').delete().match(row);
-  box.disabled = false;
+  t.classList.remove('saving');
   if (error) { box.checked = !box.checked; msg('cohort-msg', '저장하지 못했습니다: ' + error.message); return; }
+  // 서버가 받아 준 그 칸만 화면 기록에 반영한다(전체 재로딩 없음)
+  links = box.checked ? [...links, row] : links.filter((l) => !(l.program_code === row.program_code && l.cohort === row.cohort));
   msg('cohort-msg', `${row.cohort} 에 ${programs.find((p) => p.code === row.program_code)?.name || row.program_code} 을 ${box.checked ? '켰' : '껐'}습니다.`, 'ok');
-  await load(); render();
+  renderMatrix();
 });
 
-$('btn-cohort-add').addEventListener('click', async () => {
+$('btn-cohort-add').addEventListener('click', () => busy($('btn-cohort-add'), async () => {
   const name = $('cohort-new').value.trim();
   if (!name) { msg('cohort-msg', '기수 이름을 넣으세요'); return; }
   const { error } = await sb.from('uvengers_cohorts').insert({ name, sort: 100 + cohorts.length * 10 });
@@ -186,9 +208,9 @@ $('btn-cohort-add').addEventListener('click', async () => {
   $('cohort-new').value = '';
   msg('cohort-msg', `${name} 을 추가했습니다.`, 'ok');
   await load(); render();
-});
+}));
 
-$('btn-rel-save').addEventListener('click', async () => {
+$('btn-rel-save').addEventListener('click', () => busy($('btn-rel-save'), async () => {
   const f = {
     program_code: $('rel-program').value, version: $('rel-version').value.trim(), tag: $('rel-tag').value.trim(),
     file_name: $('rel-file').value.trim(), bytes: Number(String($('rel-bytes').value).replace(/[^0-9]/g, '')),
@@ -198,20 +220,22 @@ $('btn-rel-save').addEventListener('click', async () => {
   };
   const errors = releaseFormErrors(f);
   if (errors.length) { msg('rel-msg', errors.join(' · ')); return; }
-  $('btn-rel-save').disabled = true;
-  const { error } = await sb.from('uvengers_releases').insert({ ...f, published_at: f.published_at + 'T00:00:00+09:00' });
-  $('btn-rel-save').disabled = false;
+  // 게시일은 날짜만 받으므로 같은 날 두 판이면 등록 순(id)이 최신을 정한다 — 시각은 지금 시각으로
+  const { error } = await sb.from('uvengers_releases').insert({ ...f, published_at: f.published_at + 'T' + new Date().toTimeString().slice(0, 8) + '+09:00' });
   if (error) { msg('rel-msg', '등록하지 못했습니다: ' + (error.code === '23505' ? '같은 태그가 이미 있습니다' : error.message)); return; }
   msg('rel-msg', `${f.tag} 을 등록했습니다.`, 'ok');
+  for (const id of ['rel-version', 'rel-tag', 'rel-file', 'rel-bytes', 'rel-date', 'rel-sha', 'rel-url', 'rel-notes-text', 'rel-notes']) $(id).value = '';
   await load(); render();
-});
+}));
 
-$('btn-prg-save').addEventListener('click', async () => {
+$('btn-prg-save').addEventListener('click', () => busy($('btn-prg-save'), async () => {
   const row = { code: $('prg-code').value.trim(), name: $('prg-name').value.trim(), tagline: $('prg-tagline').value.trim() || null,
     guide_url: $('prg-guide').value.trim() || null };
   if (!/^[a-z0-9-]+$/.test(row.code) || !row.name) { msg('prg-msg', '코드는 영문 소문자·숫자·하이픈, 이름은 비울 수 없습니다'); return; }
+  if (row.guide_url && !/^https:\/\//.test(row.guide_url)) { msg('prg-msg', '안내 링크는 https:// 로 시작해야 합니다'); return; }
   const { error } = await sb.from('uvengers_programs').insert(row);
-  if (error) { msg('prg-msg', '추가하지 못했습니다: ' + error.message); return; }
+  if (error) { msg('prg-msg', '추가하지 못했습니다: ' + (error.code === '23505' ? '이미 있는 코드입니다' : error.message)); return; }
   msg('prg-msg', `${row.name} 을 추가했습니다.`, 'ok');
+  for (const id of ['prg-code', 'prg-name', 'prg-tagline', 'prg-guide']) $(id).value = '';
   await load(); render();
-});
+}));

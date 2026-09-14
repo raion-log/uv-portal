@@ -38,9 +38,10 @@
 
     <!-- 로그인 뒤 -->
     <section id="view-app" class="hidden">
-      <div class="tabs" id="tabs">
-        <button class="tab on" data-tab="mine">내 프로그램</button>
-        <button class="tab hidden" data-tab="admin" id="tab-admin">프로그램 관리</button>
+      <div id="load-msg"></div>
+      <div class="tabs" id="tabs" role="tablist">
+        <button class="tab on" data-tab="mine" role="tab" aria-selected="true">내 프로그램</button>
+        <button class="tab hidden" data-tab="admin" id="tab-admin" role="tab" aria-selected="false">프로그램 관리</button>
       </div>
 
       <div id="pane-mine">
@@ -105,7 +106,8 @@
     </section>
   </main>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+  <!-- SRI: CDN 이 바뀌면 안 싣는다(sha384 는 2026-09-14 에 내려받아 잰 값) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js" integrity="sha384-0w2KAL2YHP6wKOkUDzkCDGgVvfmHnj02DHeQ6XcHOgTfFsGyonKOpShMH1x6nk9o" crossorigin="anonymous"></script>
   <script type="module" src="portal.js"></script>
 </body>
 </html>

@@ -121,6 +121,7 @@ td.nw{white-space:nowrap}
 .matrix th.p span{display:inline-block;max-width:150px;white-space:normal;line-height:1.35}
 .matrix td.p{text-align:center;padding:9px 8px}
 .matrix input[type=checkbox]{width:16px;height:16px;margin:0;accent-color:var(--ac2);cursor:pointer}
+.matrix table.saving{pointer-events:none;opacity:.55}
 tr:hover td{background:rgba(123,147,255,.05)}
 
 /* ── 탭 ───────────────────────────────────────────── */
