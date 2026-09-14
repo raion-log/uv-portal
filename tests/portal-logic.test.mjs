@@ -116,10 +116,11 @@ test('카드는 가장 새 판 하나를 받으라고 내밀고 나머지는 지
   assert.deepEqual(pickRelease([]), { pick: null, others: [] });
 });
 
-test('바뀐 점은 비워도 되고 240자 안이어야 한다', () => {
+test('바뀐 점은 비워도 되고 600자 안이어야 한다(rc.6 의 CHANGELOG 제목 다섯 줄 338자가 들어가야 한다)', () => {
   assert.deepEqual(releaseFormErrors({ ...OK_FORM, notes: '두 줄\n요약' }), []);
   assert.deepEqual(releaseFormErrors({ ...OK_FORM, notes: '' }), []);
-  assert.deepEqual(releaseFormErrors({ ...OK_FORM, notes: 'x'.repeat(241) }), ['바뀐 점은 240자 안으로 줄여 주세요']);
+  assert.deepEqual(releaseFormErrors({ ...OK_FORM, notes: 'x'.repeat(338) }), []);
+  assert.deepEqual(releaseFormErrors({ ...OK_FORM, notes: 'x'.repeat(601) }), ['바뀐 점은 600자 안으로 줄여 주세요']);
 });
 
 test('바뀐 점은 줄마다 한 항목 — 앞의 - · • 는 떼고 빈 줄은 버린다', async () => {
@@ -212,4 +213,23 @@ test('새 비밀번호는 길이만 본다(6자 이상) — 앱·서버 정책�
   const { passwordProblem } = await import('../portal-logic.mjs');
   assert.equal(passwordProblem('abcde'), '비밀번호는 6자 이상이어야 합니다.');
   assert.equal(passwordProblem('abcdef'), '');
+});
+
+// ── 가입(앱과 같은 절차)과 릴리스 등록 스크립트의 순수 부분 ──
+test('가입 폼 검사 — 이메일 아이디·비밀번호(6자)·성함은 필수, 연락처 끝 4자리는 넣으면 숫자 4개', async () => {
+  const { signupErrors } = await import('../portal-logic.mjs');
+  const ok = { idInput: 'uvgood2026', password: 'abcdef', name: '홍길동', phone_last4: '1234', cohort: '유유스 1기', referral_code: '' };
+  assert.deepEqual(signupErrors(ok), []);
+  assert.deepEqual(signupErrors({ ...ok, phone_last4: '' }), []);                                  // 선택
+  assert.deepEqual(signupErrors({ ...ok, name: '' }), ['성함을 넣어 주세요']);
+  assert.deepEqual(signupErrors({ ...ok, password: 'abc' }), ['비밀번호는 6자 이상이어야 합니다.']);
+  assert.deepEqual(signupErrors({ ...ok, idInput: '한글' }), ['이메일 아이디(@ 앞부분)만 입력해 주세요']);
+  assert.deepEqual(signupErrors({ ...ok, phone_last4: '12a' }), ['연락처 끝 4자리는 숫자 4개입니다']);
+});
+
+test('CHANGELOG 의 그 판 절에서 ### 제목만 뽑아 바뀐 점 항목으로 쓴다', async () => {
+  const { changelogNotes } = await import('../portal-logic.mjs');
+  const md = `# 바뀐 점\n\n## [1.3.3-rc.7] - 2026-09-15\n\n### 첫 번째 변화 (rc.2)\n\n설명\n\n### 두 번째 변화\n\n## [1.3.3-rc.6] - 2026-09-13\n\n### 옛 변화\n`;
+  assert.deepEqual(changelogNotes(md, '1.3.3-rc.7'), ['첫 번째 변화', '두 번째 변화']);
+  assert.deepEqual(changelogNotes(md, '9.9.9'), []);
 });

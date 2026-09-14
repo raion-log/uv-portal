@@ -1,6 +1,6 @@
 // UV 포털 — 로그인 뒤 역할별 화면. 데이터 보호는 서버 RLS(sql/portal.sql)가 한다; 여기는 받은 만큼만 그린다.
 import { roleOf, visiblePrograms, latestRelease, pickRelease, notesLines, cohortMatrix, fmtBytes, fmtDate, versionLabel, pickMembership,
-  validUntilLabel, releaseFormErrors, focusPrograms, focusFromLocation, toGmail, validGmailLocal, passwordProblem } from './portal-logic.mjs';
+  validUntilLabel, focusPrograms, focusFromLocation, toGmail, validGmailLocal, passwordProblem, signupErrors } from './portal-logic.mjs';
 
 // ★프로그램 전용 링크 — `?p=uv-global-reaction-editor`(또는 `#…`)로 들어오면 그 프로그램 하나만 보인다. 허브로 가는 단추는 없다.
 //   (사용자 2026-09-14: 「그 링크가 독립적으로만 작동하면 돼. 별도 허브로 안 넘어오고 그 프로그램만 볼 수 있게」)
@@ -40,10 +40,13 @@ $('btn-email').addEventListener('click', () => busy($('btn-email'), async () => 
 $('login-pw').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('btn-email').click(); });
 $('btn-logout').addEventListener('click', async () => { await sb.auth.signOut(); location.reload(); });
 
+// ── 로그인 전 화면 셋(로그인·재설정·가입) 중 하나만 보인다 ──
+const PRE_VIEWS = ['view-login', 'view-reset', 'view-signup'];
+const showView = (id) => { for (const v of PRE_VIEWS) $(v).classList.toggle('hidden', v !== id); };
+
 // ── 비밀번호 재설정 — 앱과 같은 방식: 메일의 8자리 코드로 확인한 뒤 새 비밀번호를 정한다(리디렉트 없음) ──
-const showReset = (on) => { $('view-reset').classList.toggle('hidden', !on); $('view-login').classList.toggle('hidden', on); msg('reset-msg', ''); };
-$('btn-forgot').addEventListener('click', () => { $('reset-email').value = $('login-email').value.trim(); showReset(true); });
-$('btn-reset-back').addEventListener('click', (e) => { e.preventDefault(); showReset(false); });
+$('btn-forgot').addEventListener('click', () => { $('reset-email').value = $('login-email').value.trim(); showView('view-reset'); msg('reset-msg', ''); });
+$('btn-reset-back').addEventListener('click', (e) => { e.preventDefault(); showView('view-login'); });
 $('btn-reset-send').addEventListener('click', () => busy($('btn-reset-send'), async () => {
   const idInput = $('reset-email').value.trim();
   if (!validGmailLocal(idInput)) { msg('reset-msg', '이메일 아이디(@ 앞부분)만 입력해 주세요.'); return; }
@@ -76,13 +79,13 @@ const { data: { session } } = await sb.auth.getSession();
 if (session) { if (session.user?.id !== entered) enter(session); } else leave();
 
 function leave() {
-  $('view-login').classList.remove('hidden'); $('view-app').classList.add('hidden');
+  showView('view-login'); $('view-app').classList.add('hidden');
   $('btn-logout').classList.add('hidden'); $('who').textContent = '';
 }
 
 async function enter(session) {
   entered = session.user?.id || 'x';
-  $('view-login').classList.add('hidden'); $('view-app').classList.remove('hidden'); $('btn-logout').classList.remove('hidden');
+  showView(''); $('view-app').classList.remove('hidden'); $('btn-logout').classList.remove('hidden');
   // 로그인이 끝난 뒤에야 주소를 정리한다 — 그 전에 hash 를 지우면 supabase 가 토큰을 못 읽는다
   if (FOCUS && !/[?&]p=/.test(location.search)) { try { history.replaceState(null, '', location.pathname + '?p=' + FOCUS); } catch {} }
   const { data, error } = await sb.rpc('portal_me');
@@ -124,8 +127,11 @@ function render() {
   const mine = focusPrograms(all, FOCUS);
   const grid = $('mine-grid'); grid.replaceChildren();
   // 전용 링크인데 자격이 없으면 「열려 있지 않은 프로그램」, 링크 없이 자격이 하나도 없으면 「열린 프로그램 없음」
-  $('focus-empty').classList.toggle('hidden', !(FOCUS && mine.length === 0));
-  $('mine-empty').classList.toggle('hidden', !!FOCUS || mine.length > 0);
+  // 승인 대기 중인 가입(편집기 표 pending)이면 「열린 프로그램 없음」 대신 「승인 대기」
+  const pending = mine.length === 0 && (me.memberships || []).some((x) => String(x.status || '').toLowerCase() === 'pending');
+  $('mine-pending').classList.toggle('hidden', !pending);
+  $('focus-empty').classList.toggle('hidden', pending || !(FOCUS && mine.length === 0));
+  $('mine-empty').classList.toggle('hidden', pending || !!FOCUS || mine.length > 0);
   // ★프로그램 하나 = 카드 하나, 받을 것도 하나. 가장 새 판(후보 포함)을 내밀고 바뀐 점 두 줄을 붙인다. 나머지 판과 확인값(SHA)은 접는다.
   //   (사용자 2026-09-14 「같은 프로그램은 하나로 합쳐서… 뭘 받아야하는지 모르겠음」 「바뀐 점도 2줄 정도는 써줘」)
   // 배지: 내미는 판은 늘 「최신」, 판 이름에 RC 가 붙으면 그걸로 충분하다(사용자 2026-09-14 「뱃지도 왠 후보로 들어가있어?」). 지난 판은 정식/RC.
@@ -192,8 +198,6 @@ function renderAdmin() {
       <td><code>${esc(r.file_name)}</code><br><span class="faint">${esc(fmtBytes(r.bytes))}</span></td><td><code>${esc(String(r.sha256 || '').slice(0, 12))}…</code></td>
       <td class="nw"><a href="${esc(r.download_url)}">받기</a>${r.notes_url ? ` · <a href="${esc(r.notes_url)}" target="_blank" rel="noopener">노트</a>` : ''}</td>
     </tr>`).join('') || '<tr><td colspan="8" class="faint">아직 등록된 판이 없습니다</td></tr>'}</tbody>`;
-  const sel = $('rel-program');
-  sel.replaceChildren(...programs.map((p) => { const o = document.createElement('option'); o.value = p.code; o.textContent = p.name; return o; }));
   renderMatrix();
 }
 
@@ -234,32 +238,41 @@ $('btn-cohort-add').addEventListener('click', () => busy($('btn-cohort-add'), as
   await load(); render();
 }));
 
-$('btn-rel-save').addEventListener('click', () => busy($('btn-rel-save'), async () => {
-  const f = {
-    program_code: $('rel-program').value, version: $('rel-version').value.trim(), tag: $('rel-tag').value.trim(),
-    file_name: $('rel-file').value.trim(), bytes: Number(String($('rel-bytes').value).replace(/[^0-9]/g, '')),
-    sha256: $('rel-sha').value.trim().toLowerCase(), download_url: $('rel-url').value.trim(),
-    notes: $('rel-notes-text').value.trim() || null,
-    notes_url: $('rel-notes').value.trim() || null, published_at: $('rel-date').value, is_prerelease: $('rel-pre').checked,
-  };
-  const errors = releaseFormErrors(f);
-  if (errors.length) { msg('rel-msg', errors.join(' · ')); return; }
-  // 게시일은 날짜만 받으므로 같은 날 두 판이면 등록 순(id)이 최신을 정한다 — 시각은 지금 시각으로
-  const { error } = await sb.from('uvengers_releases').insert({ ...f, published_at: f.published_at + 'T' + new Date().toTimeString().slice(0, 8) + '+09:00' });
-  if (error) { msg('rel-msg', '등록하지 못했습니다: ' + (error.code === '23505' ? '같은 태그가 이미 있습니다' : error.message)); return; }
-  msg('rel-msg', `${f.tag} 을 등록했습니다.`, 'ok');
-  for (const id of ['rel-version', 'rel-tag', 'rel-file', 'rel-bytes', 'rel-date', 'rel-sha', 'rel-url', 'rel-notes-text', 'rel-notes']) $(id).value = '';
-  await load(); render();
-}));
+// (판 등록·프로그램 추가 폼은 뺐다 — 사용자 2026-09-14. 판은 scripts/register-release.mjs, 프로그램은 sql/portal.sql 씨앗.)
 
-$('btn-prg-save').addEventListener('click', () => busy($('btn-prg-save'), async () => {
-  const row = { code: $('prg-code').value.trim(), name: $('prg-name').value.trim(), tagline: $('prg-tagline').value.trim() || null,
-    guide_url: $('prg-guide').value.trim() || null };
-  if (!/^[a-z0-9-]+$/.test(row.code) || !row.name) { msg('prg-msg', '코드는 영문 소문자·숫자·하이픈, 이름은 비울 수 없습니다'); return; }
-  if (row.guide_url && !/^https:\/\//.test(row.guide_url)) { msg('prg-msg', '안내 링크는 https:// 로 시작해야 합니다'); return; }
-  const { error } = await sb.from('uvengers_programs').insert(row);
-  if (error) { msg('prg-msg', '추가하지 못했습니다: ' + (error.code === '23505' ? '이미 있는 코드입니다' : error.message)); return; }
-  msg('prg-msg', `${row.name} 을 추가했습니다.`, 'ok');
-  for (const id of ['prg-code', 'prg-name', 'prg-tagline', 'prg-guide']) $(id).value = '';
-  await load(); render();
+// ── 가입 — 편집기 앱과 같은 절차: signUp → 메일의 8자리 코드 verifyOtp(signup) → uvengers_editor_members 에 본인 행(트리거가 pending 강제) ──
+let pendingSignup = null;
+$('btn-goto-signup').addEventListener('click', async (e) => {
+  e.preventDefault(); showView('view-signup'); msg('su-msg', '');
+  const { data } = await sb.rpc('portal_signup_cohorts');
+  const sel = $('su-cohort'); sel.replaceChildren(new Option('기수 선택', ''));
+  for (const c of data || []) sel.append(new Option(c.name, c.name));
+});
+$('btn-su-back').addEventListener('click', (e) => { e.preventDefault(); showView('view-login'); });
+$('btn-su').addEventListener('click', () => busy($('btn-su'), async () => {
+  const f = { idInput: $('su-email').value.trim(), password: $('su-pw').value, name: $('su-name').value.trim(),
+    phone_last4: $('su-phone').value.trim(), cohort: $('su-cohort').value, referral_code: $('su-ref').value.trim() };
+  const errs = signupErrors(f);
+  if (errs.length) { msg('su-msg', errs.join(' · ')); return; }
+  const email = toGmail(f.idInput);
+  const { data, error } = await sb.auth.signUp({ email, password: f.password });
+  $('su-pw').value = '';
+  if (error) { msg('su-msg', /already|registered|exists/i.test(error.message) ? '이미 가입된 이메일입니다. 로그인하거나 비밀번호를 재설정해 주세요.' : '가입하지 못했습니다: ' + error.message); return; }
+  // 확인 메일이 꺼져 있거나 이미 확인된 계정이면 identities 가 비어 온다 — 앱과 같이 「이미 가입」으로 안내
+  if (data?.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) { msg('su-msg', '이미 가입된 이메일입니다. 로그인하거나 비밀번호를 재설정해 주세요.'); return; }
+  pendingSignup = { email, name: f.name, phone_last4: f.phone_last4, cohort: f.cohort, referral_code: f.referral_code || null };
+  $('su-step2').classList.remove('hidden');
+  msg('su-msg', `${email} 로 8자리 코드를 보냈습니다. 1시간 안에 아래에 넣어 주세요.`, 'ok');
+}));
+$('btn-su-verify').addEventListener('click', () => busy($('btn-su-verify'), async () => {
+  if (!pendingSignup) { msg('su-msg', '먼저 가입 신청을 눌러 주세요.'); return; }
+  const code = $('su-code').value.replace(/\D/g, '');
+  if (code.length !== 8) { msg('su-msg', '메일로 온 8자리 코드를 넣어 주세요.'); return; }
+  const v = await sb.auth.verifyOtp({ email: pendingSignup.email, token: code, type: 'signup' });
+  if (v.error) { msg('su-msg', '코드가 맞지 않거나 만료됐습니다. 다시 신청해 새 코드로 시도해 주세요.'); return; }
+  const uid = v.data?.user?.id || v.data?.session?.user?.id;
+  const ins = await sb.from('uvengers_editor_members').insert({ id: uid, email: pendingSignup.email, name: pendingSignup.name,
+    phone_last4: pendingSignup.phone_last4 || null, cohort: pendingSignup.cohort || null, referral_code: pendingSignup.referral_code });
+  if (ins.error && ins.error.code !== '23505') { msg('su-msg', '회원 등록에 실패했습니다: ' + ins.error.message); return; }
+  location.reload();   // 코드 확인으로 로그인된 상태 — 들어가면 「승인 대기」가 보인다
 }));

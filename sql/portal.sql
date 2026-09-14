@@ -124,6 +124,26 @@ returns jsonb language sql stable security definer set search_path = public, pri
   );
 $$;
 
+-- 공개(anon 허용) 둘: 릴리스 검증이 「포털 최신 판이 이번 판인가」를 묻는 함수(판·태그만, 링크 없음),
+-- 가입 화면의 기수 선택 목록(편집기 앱의 uvengers_editor_cohorts 활성 이름). 둘 다 공개돼도 되는 정보다.
+create or replace function public.portal_latest_public(p_code text)
+returns table (version text, tag text, published_at timestamptz, is_prerelease boolean)
+language sql stable security definer set search_path = public as $$
+  select r.version, r.tag, r.published_at, r.is_prerelease
+    from public.uvengers_releases r
+   where r.program_code = p_code
+   order by r.published_at desc, r.id desc
+   limit 1;
+$$;
+create or replace function public.portal_signup_cohorts()
+returns table (name text) language sql stable security definer set search_path = public as $$
+  select c.name from public.uvengers_editor_cohorts c where c.active = true order by c.name;
+$$;
+revoke all on function public.portal_latest_public(text) from public;
+revoke all on function public.portal_signup_cohorts() from public;
+grant execute on function public.portal_latest_public(text) to anon, authenticated;
+grant execute on function public.portal_signup_cohorts() to anon, authenticated;
+
 -- 관리자용: 기수 목록과 회원 수(두 회원 표의 이메일을 합쳐 센다)
 create or replace function public.portal_cohorts()
 returns table (name text, sort int, members bigint) language sql stable security definer set search_path = public, private as $$

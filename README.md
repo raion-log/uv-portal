@@ -3,7 +3,7 @@
 수강생·관리자 프로그램 창구. 로그인 하나로 역할에 따라 다른 화면을 본다.
 
 - 주소: https://raion-log.github.io/uv-portal/
-- 관리자: 「프로그램 관리」 — 전체 프로그램·판·판 등록
+- 관리자: 「프로그램 관리」 — 전체 프로그램·기수 × 프로그램 배정·배포 기록
 - 수강생: 「내 프로그램」 — 자기 자격이 있는 프로그램의 최신 판 다운로드·이용 기한
 - 설계 정본: `uv-global-reaction-editor/docs/superpowers/specs/2026-09-14-uv-portal-design.md`
 
@@ -39,4 +39,12 @@
 
 ## 릴리스 때
 
-굽고 GitHub Release 를 올린 뒤 「프로그램 관리 → 판 등록」에 CANDIDATE_READY 의 판·태그·파일·크기·해시·링크·게시일을 넣는다.
+굽고 GitHub Release 를 올린 뒤 스크립트가 판을 넣는다(관리자 폼은 없앴다 — 사용자 2026-09-14):
+
+```
+SUPABASE_ACCESS_TOKEN=sbp_... node scripts/register-release.mjs --tag v1.3.3-rc.7 --sha256 <CANDIDATE_READY 의 값> --changelog ../uv-global-reaction-editor/CHANGELOG.md
+```
+
+파일·크기·링크·게시 시각·RC 여부는 GitHub 릴리스에서, 바뀐 점은 CHANGELOG 의 그 판 절 `###` 제목에서 가져온다(`--notes-file` 로 바꿀 수 있다).
+끝에 공개 함수 `portal_latest_public` 로 되읽어 `PORTAL_RELEASE_OK` 를 찍는다 — 편집기의 `npm run verify:release` 가 같은 함수를 본다.
+프로그램 추가는 `sql/portal.sql` 씨앗 한 줄, 기수 배정은 관리자 탭 「기수 × 프로그램」.
