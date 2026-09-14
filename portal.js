@@ -1,5 +1,5 @@
 // UV 포털 — 로그인 뒤 역할별 화면. 데이터 보호는 서버 RLS(sql/portal.sql)가 한다; 여기는 받은 만큼만 그린다.
-import { roleOf, visiblePrograms, latestRelease, pickRelease, notesLines, fmtBytes, validUntilLabel, releaseFormErrors,
+import { roleOf, visiblePrograms, latestRelease, pickRelease, notesLines, cohortMatrix, fmtBytes, validUntilLabel, releaseFormErrors,
   focusPrograms, focusFromLocation } from './portal-logic.mjs';
 
 // ★프로그램 전용 링크 — `?p=uv-global-reaction-editor`(또는 `#…`)로 들어오면 그 프로그램 하나만 보인다. 허브로 가는 단추는 없다.
@@ -17,6 +17,8 @@ const msg = (id, text, kind = 'err') => { const el = $(id); el.className = text 
 
 let me = null;          // portal_me() 답
 let programs = [];      // RLS 가 걸러 준 프로그램(+판)
+let cohorts = [];       // 관리자만: portal_cohorts() — 기수·회원 수
+let links = [];         // 관리자만: uvengers_program_cohorts — 기수 × 프로그램
 
 // ── 로그인 ──────────────────────────────────────────────────────────────────
 $('btn-google').addEventListener('click', async () => {
@@ -56,6 +58,13 @@ async function load() {
     .order('sort');
   programs = error ? [] : (data || []);
   if (error) console.error('프로그램을 못 읽었습니다', error);
+  if (roleOf(me) === 'admin') {
+    const c = await sb.rpc('portal_cohorts');
+    cohorts = c.error ? [] : (c.data || []);
+    const l = await sb.from('uvengers_program_cohorts').select('program_code,cohort');
+    links = l.error ? [] : (l.data || []);
+    if (c.error || l.error) console.error('기수 표를 못 읽었습니다', c.error || l.error);
+  }
 }
 
 // ── 탭 ──────────────────────────────────────────────────────────────────────
@@ -101,7 +110,7 @@ function render() {
         ${p.guide_url ? `<a class="btn small" href="${esc(p.guide_url)}" target="_blank" rel="noopener">설치 안내</a>` : ''}
         ${pick.notes_url ? `<a class="btn small" href="${esc(pick.notes_url)}" target="_blank" rel="noopener">바뀐 점 전체</a>` : ''}
       </div>` : '<div class="faint">아직 배포된 판이 없습니다</div>'}
-      <div class="meta"><span class="k">이용 기한</span><span>${esc(roleOf(me) === 'admin' && !m ? '관리자' : validUntilLabel(m?.valid_until))}</span></div>
+      <div class="meta"><span class="k">이용 기한</span><span>${esc(roleOf(me) === 'admin' && !m ? '관리자' : m?.via === 'cohort' ? `${m.cohort} 기수 · 기한 없음` : validUntilLabel(m?.valid_until))}</span></div>
       ${pick ? `<details class="hist"><summary>확인값${others.length ? ` · 지난 판 ${others.length}개` : ''}</summary>
         <div class="faint">SHA-256 <code>${esc(pick.sha256)}</code></div>
         ${others.length ? `<ul>${others.map(histItem).join('')}</ul>` : ''}</details>` : ''}`;
@@ -137,7 +146,42 @@ function renderAdmin() {
     </tr>`).join('') || '<tr><td colspan="8" class="faint">아직 등록된 판이 없습니다</td></tr>'}</tbody>`;
   const sel = $('rel-program');
   sel.replaceChildren(...programs.map((p) => { const o = document.createElement('option'); o.value = p.code; o.textContent = p.name; return o; }));
+  renderMatrix();
 }
+
+// ── 기수 × 프로그램(관리자) — 허브의 배포표를 가져온 것. 칸을 켜고 끄면 바로 저장된다 ──
+function renderMatrix() {
+  const rows = cohortMatrix(programs, cohorts, links);
+  const head = programs.map((p) => `<th class="p"><span>${esc(p.name)}</span></th>`).join('');
+  const body = rows.map((r) => `<tr>
+      <td class="nw"><b>${esc(r.cohort)}</b></td><td class="nw faint">${r.members}명</td>
+      ${r.cells.map((c) => `<td class="p"><input type="checkbox" data-code="${esc(c.code)}" data-cohort="${esc(r.cohort)}" ${c.on ? 'checked' : ''} aria-label="${esc(r.cohort)} · ${esc(c.name)}"></td>`).join('')}
+    </tr>`).join('');
+  $('cohort-matrix').innerHTML = `<thead><tr><th>기수</th><th>회원</th>${head}</tr></thead><tbody>${body || `<tr><td colspan="${programs.length + 2}" class="faint">기수가 없습니다</td></tr>`}</tbody>`;
+}
+
+$('cohort-matrix').addEventListener('change', async (e) => {
+  const box = e.target.closest('input[type=checkbox][data-code]'); if (!box) return;
+  const row = { program_code: box.dataset.code, cohort: box.dataset.cohort };
+  box.disabled = true;
+  const { error } = box.checked
+    ? await sb.from('uvengers_program_cohorts').insert(row)
+    : await sb.from('uvengers_program_cohorts').delete().match(row);
+  box.disabled = false;
+  if (error) { box.checked = !box.checked; msg('cohort-msg', '저장하지 못했습니다: ' + error.message); return; }
+  msg('cohort-msg', `${row.cohort} 에 ${programs.find((p) => p.code === row.program_code)?.name || row.program_code} 을 ${box.checked ? '켰' : '껐'}습니다.`, 'ok');
+  await load(); render();
+});
+
+$('btn-cohort-add').addEventListener('click', async () => {
+  const name = $('cohort-new').value.trim();
+  if (!name) { msg('cohort-msg', '기수 이름을 넣으세요'); return; }
+  const { error } = await sb.from('uvengers_cohorts').insert({ name, sort: 100 + cohorts.length * 10 });
+  if (error) { msg('cohort-msg', '추가하지 못했습니다: ' + (error.code === '23505' ? '이미 있는 기수입니다' : error.message)); return; }
+  $('cohort-new').value = '';
+  msg('cohort-msg', `${name} 을 추가했습니다.`, 'ok');
+  await load(); render();
+});
 
 $('btn-rel-save').addEventListener('click', async () => {
   const f = {

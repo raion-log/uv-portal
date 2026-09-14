@@ -114,6 +114,13 @@ td{padding:11px 14px 11px 0;border-bottom:1px solid #222c47;vertical-align:top;c
 tr:last-child td{border-bottom:0}
 td b{color:#fff}
 td.nw{white-space:nowrap}
+
+/* ── 기수 × 프로그램 표 — 허브 .matrix 와 같은 결 ─── */
+.matrix table{font-size:.84rem}
+.matrix th.p{text-align:center;padding:0 8px 9px;min-width:96px}
+.matrix th.p span{display:inline-block;max-width:150px;white-space:normal;line-height:1.35}
+.matrix td.p{text-align:center;padding:9px 8px}
+.matrix input[type=checkbox]{width:16px;height:16px;margin:0;accent-color:var(--ac2);cursor:pointer}
 tr:hover td{background:rgba(123,147,255,.05)}
 
 /* ── 탭 ───────────────────────────────────────────── */

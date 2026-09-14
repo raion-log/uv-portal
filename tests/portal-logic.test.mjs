@@ -127,3 +127,15 @@ test('바뀐 점은 줄마다 한 항목 — 앞의 - · • 는 떼고 빈 줄�
   assert.deepEqual(notesLines('- AI 응답이 멈춰도 전체가 멈추지 않음\n• 발음 사전\n\n  나레이션 분량 ↑  '), ['AI 응답이 멈춰도 전체가 멈추지 않음', '발음 사전', '나레이션 분량 ↑']);
   assert.deepEqual(notesLines(null), []);
 });
+
+test('기수 × 프로그램 표 — 기수마다 한 줄, 프로그램마다 켜짐/꺼짐 칸, 회원 수', async () => {
+  const { cohortMatrix } = await import('../portal-logic.mjs');
+  const cohorts = [{ name: '빈이파파 1기', sort: 10, members: 0 }, { name: '유벤져스 1기', sort: 60, members: 98 }];
+  const programs = [{ code: 'flow', name: 'RAION Flow Pro' }, { code: 'uv-global-reaction-editor', name: 'UV 글로벌 반응 편집기' }];
+  const links = [{ program_code: 'flow', cohort: '빈이파파 1기' }];
+  const rows = cohortMatrix(programs, cohorts, links);
+  assert.deepEqual(rows.map((r) => r.cohort), ['빈이파파 1기', '유벤져스 1기']);
+  assert.deepEqual(rows[0].cells.map((c) => [c.code, c.on]), [['flow', true], ['uv-global-reaction-editor', false]]);
+  assert.equal(rows[1].members, 98);
+  assert.deepEqual(rows[1].cells.map((c) => c.on), [false, false]);
+});

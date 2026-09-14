@@ -55,6 +55,16 @@
           <div style="overflow-x:auto"><table id="admin-table"></table></div>
         </div>
         <div class="card">
+          <h2>기수 × 프로그램</h2>
+          <p class="faint">허브에서 정리하던 표를 그대로 가져왔습니다. 칸을 켜면 그 기수 회원 전원에게 그 프로그램이 보입니다. 반응 편집기는 앱의 가입·승인·이용 기한이 우선이라 이 표의 체크는 표시용입니다.</p>
+          <div class="matrix" style="overflow-x:auto"><table id="cohort-matrix"></table></div>
+          <div class="row" style="margin-top:12px">
+            <input id="cohort-new" placeholder="새 기수 이름 — 회원 표의 기수와 글자가 같아야 합니다 (예: 유벤져스 3기)" style="max-width:420px">
+            <button class="btn" id="btn-cohort-add">기수 추가</button>
+          </div>
+          <div id="cohort-msg"></div>
+        </div>
+        <div class="card">
           <h2>배포 기록</h2>
           <p class="faint">등록된 판 전부, 새 것부터. 수강생 카드에는 가장 새 판 하나와 바뀐 점만 보이고, 나머지 판과 SHA-256 은 「확인값 · 지난 판」에 접혀 있습니다.</p>
           <div style="overflow-x:auto"><table id="admin-releases"></table></div>

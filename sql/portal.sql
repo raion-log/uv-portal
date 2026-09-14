@@ -47,10 +47,36 @@ create table if not exists public.uvengers_program_members (
   unique (user_id, program_code)
 );
 
+-- ── 기수 × 프로그램 — 허브(raion-log/uv 의 courses.js·products/*.js 의 courses)를 그대로 가져온 것 ────────
+--    사용자 2026-09-14: 「이전에 정리했던 곳에 다 정리되어있으니까 그거 갖고 와서 여기에 정리… 관리자한테만 보여지게」.
+--    기수에 프로그램을 켜면 그 기수 회원(uvengers_members.batch / uvengers_editor_members.cohort) 전원에게 보인다.
+--    ★반응 편집기는 예외 — 앱의 가입·승인·이용 기한(uvengers_editor_members)이 우선이고 기수 체크는 표시용이다.
+create table if not exists public.uvengers_cohorts (
+  name        text primary key,                       -- '유벤져스 1기' — 회원 표의 batch/cohort 와 글자가 같아야 한다
+  sort        int  not null default 100,
+  created_at  timestamptz not null default now()
+);
+create table if not exists public.uvengers_program_cohorts (
+  program_code text not null references public.uvengers_programs(code) on delete cascade,
+  cohort       text not null references public.uvengers_cohorts(name)  on delete cascade,
+  created_at   timestamptz not null default now(),
+  primary key (program_code, cohort)
+);
+
 -- ── 판정 함수 ─────────────────────────────────────────────────────────────────
 create or replace function public.portal_is_admin()
 returns boolean language sql stable security definer set search_path = public, private as $$
   select coalesce(private.is_admin(), false);
+$$;
+
+-- 로그인한 사람의 기수(둘 다 본다: 관리 표의 batch, 편집기 표의 cohort)
+create or replace function public.portal_my_cohorts()
+returns setof text language sql stable security definer set search_path = public, private as $$
+  select m.batch from public.uvengers_members m
+   where m.email = (auth.jwt() ->> 'email') and m.batch is not null
+  union
+  select e.cohort from public.uvengers_editor_members e
+   where e.id = auth.uid() and e.cohort is not null;
 $$;
 
 create or replace function public.portal_can_see(p_code text)
@@ -65,7 +91,11 @@ returns boolean language sql stable security definer set search_path = public, p
             select 1 from public.uvengers_program_members m
              where m.user_id = auth.uid() and m.program_code = p_code
                and lower(m.status) in ('approved', 'active')
-               and (m.valid_until is null or m.valid_until >= now()));
+               and (m.valid_until is null or m.valid_until >= now()))
+      or (p_code <> 'uv-global-reaction-editor' and exists (
+            select 1 from public.uvengers_program_cohorts pc
+             where pc.program_code = p_code
+               and pc.cohort in (select public.portal_my_cohorts())));
 $$;
 
 -- 로그인한 사람의 역할과 자격을 한 번에 — 화면은 이 답만 믿는다
@@ -75,24 +105,47 @@ returns jsonb language sql stable security definer set search_path = public, pri
     'user_id', auth.uid(),
     'email', auth.jwt() ->> 'email',
     'is_admin', public.portal_is_admin(),
+    'cohorts', coalesce((select jsonb_agg(c) from public.portal_my_cohorts() c), '[]'::jsonb),
     'memberships', coalesce((
       select jsonb_agg(x) from (
-        select 'uv-global-reaction-editor' as program_code, e.status, e.valid_until
+        select 'uv-global-reaction-editor' as program_code, e.status, e.valid_until, 'editor' as via, null::text as cohort
           from public.uvengers_editor_members e where e.id = auth.uid()
         union all
-        select m.program_code, m.status, m.valid_until
+        select m.program_code, m.status, m.valid_until, 'member' as via, null::text as cohort
           from public.uvengers_program_members m where m.user_id = auth.uid()
+        union all
+        select pc.program_code, 'approved' as status, null::timestamptz as valid_until, 'cohort' as via, pc.cohort
+          from public.uvengers_program_cohorts pc
+         where pc.program_code <> 'uv-global-reaction-editor'
+           and pc.cohort in (select public.portal_my_cohorts())
       ) x), '[]'::jsonb)
   );
+$$;
+
+-- 관리자용: 기수 목록과 회원 수(두 회원 표의 이메일을 합쳐 센다)
+create or replace function public.portal_cohorts()
+returns table (name text, sort int, members bigint) language sql stable security definer set search_path = public, private as $$
+  select c.name, c.sort,
+         (select count(distinct u.email) from (
+            select m.email from public.uvengers_members m where m.batch = c.name
+            union
+            select e.email from public.uvengers_editor_members e where e.cohort = c.name) u) as members
+    from public.uvengers_cohorts c
+   where public.portal_is_admin()
+   order by c.sort, c.name;
 $$;
 
 revoke all on function public.portal_is_admin() from public;
 revoke all on function public.portal_can_see(text) from public;
 revoke all on function public.portal_me() from public;
+revoke all on function public.portal_my_cohorts() from public;
+revoke all on function public.portal_cohorts() from public;
 grant execute on function public.portal_is_admin() to authenticated;
 grant execute on function public.portal_can_see(text) to authenticated;
 grant execute on function public.portal_me() to authenticated;
-revoke execute on function public.portal_is_admin(), public.portal_can_see(text), public.portal_me() from anon; -- 기본 권한이 anon 에게도 execute 를 준다(실측 2026-09-14: anon 이 portal_me 200) — 명시적으로 회수
+grant execute on function public.portal_my_cohorts() to authenticated;
+grant execute on function public.portal_cohorts() to authenticated;
+revoke execute on function public.portal_is_admin(), public.portal_can_see(text), public.portal_me(), public.portal_my_cohorts(), public.portal_cohorts() from anon; -- 기본 권한이 anon 에게도 execute 를 준다(실측 2026-09-14: anon 이 portal_me 200) — 명시적으로 회수
 
 -- ── RLS ───────────────────────────────────────────────────────────────────────
 alter table public.uvengers_programs        enable row level security;
@@ -117,7 +170,17 @@ create policy members_self  on public.uvengers_program_members for select to aut
 create policy members_admin on public.uvengers_program_members for all    to authenticated
   using (public.portal_is_admin()) with check (public.portal_is_admin());
 
-grant select, insert, update, delete on public.uvengers_programs, public.uvengers_releases, public.uvengers_program_members to authenticated;
+alter table public.uvengers_cohorts         enable row level security;
+alter table public.uvengers_program_cohorts enable row level security;
+drop policy if exists cohorts_admin on public.uvengers_cohorts;
+drop policy if exists program_cohorts_admin on public.uvengers_program_cohorts;
+create policy cohorts_admin on public.uvengers_cohorts for all to authenticated
+  using (public.portal_is_admin()) with check (public.portal_is_admin());
+create policy program_cohorts_admin on public.uvengers_program_cohorts for all to authenticated
+  using (public.portal_is_admin()) with check (public.portal_is_admin());
+
+grant select, insert, update, delete on public.uvengers_programs, public.uvengers_releases, public.uvengers_program_members,
+  public.uvengers_cohorts, public.uvengers_program_cohorts to authenticated;
 grant usage, select on all sequences in schema public to authenticated;
 
 -- ── 첫 데이터: 반응 편집기와 지금 배포된 판 ─────────────────────────────────────
@@ -142,6 +205,50 @@ values ('uv-global-reaction-editor', '1.3.3', 'v1.3.3-rc.6', 'UV-Global-Reaction
 on conflict (program_code, tag) do nothing;
 
 -- 첫 두 판의 바뀐 점(CHANGELOG 요약). 비어 있을 때만 채운다 — 관리자가 고친 글을 덮지 않는다.
+-- 허브(raion-log/uv)의 나머지 프로그램 — products/*.js 의 id·name·desc 그대로. 판(파일·크기·해시)은 아래 릴리스 씨앗에.
+insert into public.uvengers_programs (code, name, tagline, guide_url, landing_url, sort)
+values ('flow',             'RAION Flow Pro',     'Google Flow 에서 이미지·영상 만드는 일을 반자동으로 도와주는 크롬 확장프로그램', 'https://raion-log.github.io/uv/guide/flow/', null, 20),
+       ('genspark',         'RAION Genspark Pro', 'Genspark 에서 이미지·영상 만드는 일을 반자동으로 도와주는 크롬 확장프로그램', null, null, 30),
+       ('grok',             'RAION Grok Pro',     'Grok 에서 이미지·영상 만드는 일을 반자동으로 도와주는 크롬 확장프로그램', null, null, 40),
+       ('vrewauto-classic', 'VrewAuto 자동배치 · 브루만 있는 버전', 'Vrew(브루) 씬별로 이미지를 자동 배치합니다. 캡컷 기능은 들어 있지 않습니다.', 'https://raion-log.github.io/vrewauto-releases/', null, 50),
+       ('vrewauto-new',     'VrewAuto 자동배치 · 캡컷 포함 버전',   'Vrew(브루) 씬별 이미지 자동 배치에 더해 캡컷 초안 정리까지 해 줍니다.', 'https://raion-log.github.io/vrewauto-releases/with-capcut/', null, 60)
+on conflict (code) do nothing;
+
+-- 허브 프로그램의 현재 판 — 크기는 GitHub 릴리스 자산 값, SHA-256 은 실제로 내려받아 잰 값(2026-09-14).
+-- VrewAuto 브루만 있는 버전(2.0.8)은 GitHub 릴리스에 자산이 없어 판을 넣지 않는다(허브도 설치 가이드로만 안내).
+insert into public.uvengers_releases (program_code, version, tag, file_name, bytes, sha256, download_url, notes_url, published_at, is_prerelease)
+values ('flow', '1.2.2', 'v1.2.2', 'raion-flow-pro-v1.2.2.zip', 2455477,
+        'eb25c842f42c6f1642b2b335f0dfa865661402ebd8631be2c152af6da5b6e898',
+        'https://github.com/raion-log/raion-flow-pro-release/releases/download/v1.2.2/raion-flow-pro-v1.2.2.zip',
+        'https://github.com/raion-log/raion-flow-pro-release/releases', '2026-05-22 00:00:00+09', false),
+       ('genspark', '1.0.6', 'v1.0.6', 'dist.zip', 2657173,
+        'a9b436eacadc62075c5abafdca1befa8a23b13ba731c454781274c65621e1761',
+        'https://github.com/raion-log/raion-genspark-pro-releases/releases/download/v1.0.6/dist.zip',
+        'https://github.com/raion-log/raion-genspark-pro-releases/releases', '2026-05-20 00:00:00+09', false),
+       ('grok', '8.8.6', 'v8.8.6', 'dist.zip', 3303915,
+        '1c70126416fb36d356c9a1185e1e34704d11e9fb101eb47219209048000493d2',
+        'https://github.com/raion-log/raion-grok-pro-releases/releases/download/v8.8.6/dist.zip',
+        'https://github.com/raion-log/raion-grok-pro-releases/releases', '2026-08-30 00:00:00+09', false),
+       ('vrewauto-new', '2.1.2', 'v2.1.2', 'VrewAuto_2.1.2_x64-setup.exe', 198651664,
+        '5163629f148044576095fca7d09474acccbfc518b806ae29f4f6aa4f82f9408a',
+        'https://github.com/raion-log/vrewauto-releases/releases/download/v2.1.2/VrewAuto_2.1.2_x64-setup.exe',
+        'https://github.com/raion-log/vrewauto-releases/releases', '2026-09-12 10:27:26+09', true)
+on conflict (program_code, tag) do nothing;
+
+-- 기수(허브 courses.js 순서) 와 기수 × 프로그램(허브 products/*.js 의 courses)
+insert into public.uvengers_cohorts (name, sort)
+values ('빈이파파 1기', 10), ('빈이파파 2기', 20), ('빈이파파 3기', 30), ('라이온 1기', 40), ('애삼이 1기', 50),
+       ('유벤져스 1기', 60), ('유벤져스 2기', 70), ('유유스 1기', 80)
+on conflict (name) do nothing;
+insert into public.uvengers_program_cohorts (program_code, cohort)
+values ('flow', '빈이파파 1기'), ('flow', '빈이파파 2기'), ('flow', '라이온 1기'), ('flow', '애삼이 1기'),
+       ('genspark', '빈이파파 1기'), ('genspark', '빈이파파 2기'), ('genspark', '라이온 1기'), ('genspark', '애삼이 1기'),
+       ('grok', '빈이파파 1기'), ('grok', '빈이파파 2기'), ('grok', '라이온 1기'), ('grok', '애삼이 1기'),
+       ('vrewauto-classic', '빈이파파 2기'),
+       ('vrewauto-new', '빈이파파 3기'),
+       ('uv-global-reaction-editor', '유유스 1기')
+on conflict do nothing;
+
 -- 줄마다 한 항목(카드에 목록으로 보인다).
 update public.uvengers_releases set notes = E'AI 응답이 멈춰도 전체가 멈추지 않음\n다른 나라 이야기에 한국 자료 화면이 오지 않음\n나레이션 분량 레퍼런스 수준, 일본어·번체 발음 사전\n설정 「내 계정」 탭, 진행 화면 썸네일 후보 오른쪽 열'
  where program_code = 'uv-global-reaction-editor' and tag = 'v1.3.3-rc.6' and notes is null;
