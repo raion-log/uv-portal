@@ -90,6 +90,7 @@ revoke all on function public.portal_me() from public;
 grant execute on function public.portal_is_admin() to authenticated;
 grant execute on function public.portal_can_see(text) to authenticated;
 grant execute on function public.portal_me() to authenticated;
+revoke execute on function public.portal_is_admin(), public.portal_can_see(text), public.portal_me() from anon; -- 기본 권한이 anon 에게도 execute 를 준다(실측 2026-09-14: anon 이 portal_me 200) — 명시적으로 회수
 
 -- ── RLS ───────────────────────────────────────────────────────────────────────
 alter table public.uvengers_programs        enable row level security;
@@ -139,3 +140,6 @@ values ('uv-global-reaction-editor', '1.3.3', 'v1.3.3-rc.6', 'UV-Global-Reaction
 on conflict (program_code, tag) do nothing;
 
 commit;
+
+-- REST(PostgREST) 스키마 캐시 새로고침 — 없으면 새 표·함수가 REST 에서 404 (실측 2026-09-14)
+notify pgrst, 'reload schema';
