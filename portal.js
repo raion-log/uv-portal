@@ -4,7 +4,11 @@ import { roleOf, visiblePrograms, latestRelease, pickRelease, notesLines, cohort
 
 // ★프로그램 전용 링크 — `?p=uv-global-reaction-editor`(또는 `#…`)로 들어오면 그 프로그램 하나만 보인다. 허브로 가는 단추는 없다.
 //   (사용자 2026-09-14: 「그 링크가 독립적으로만 작동하면 돼. 별도 허브로 안 넘어오고 그 프로그램만 볼 수 있게」)
-const FOCUS = focusFromLocation(location);
+//   구글 로그인은 주소를 갈아 끼우며 돌아오므로(?p= 가 사라진다) 누르기 전에 코드를 기억해 두고, 돌아온 뒤 그 값으로 잇는다.
+const FOCUS_KEY = 'uv-portal-focus';
+const remembered = (() => { try { return sessionStorage.getItem(FOCUS_KEY) || ''; } catch { return ''; } })();
+const FOCUS = focusFromLocation(location, remembered);
+if (FOCUS && !location.search.includes('p=')) { try { history.replaceState(null, '', location.pathname + '?p=' + FOCUS); } catch {} }
 
 // 공개 anon 키 — raion-admin·앱과 같은 프로젝트. 브라우저에 두라고 만든 키다(권한은 RLS 가 정한다).
 const SUPABASE_URL = 'https://dnflcjpjzqmrybtcleqy.supabase.co';
@@ -22,6 +26,7 @@ let links = [];         // 관리자만: uvengers_program_cohorts — 기수 × 
 
 // ── 로그인 ──────────────────────────────────────────────────────────────────
 $('btn-google').addEventListener('click', async () => {
+  try { if (FOCUS) sessionStorage.setItem(FOCUS_KEY, FOCUS); else sessionStorage.removeItem(FOCUS_KEY); } catch {}
   const { error } = await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.origin + location.pathname } });
   if (error) msg('login-msg', '구글 로그인을 열지 못했습니다: ' + error.message);
 });

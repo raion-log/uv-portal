@@ -182,6 +182,9 @@ create policy program_cohorts_admin on public.uvengers_program_cohorts for all t
 grant select, insert, update, delete on public.uvengers_programs, public.uvengers_releases, public.uvengers_program_members,
   public.uvengers_cohorts, public.uvengers_program_cohorts to authenticated;
 grant usage, select on all sequences in schema public to authenticated;
+-- anon 은 표를 만질 이유가 없다. RLS 정책이 authenticated 전용이라 0행이긴 하지만(실측 200 []), 기본 권한으로 받은 표 권한은 회수한다(적대평가 2026-09-14).
+revoke all on public.uvengers_programs, public.uvengers_releases, public.uvengers_program_members,
+  public.uvengers_cohorts, public.uvengers_program_cohorts from anon;
 
 -- ── 첫 데이터: 반응 편집기와 지금 배포된 판 ─────────────────────────────────────
 insert into public.uvengers_programs (code, name, tagline, guide_url, landing_url, sort)

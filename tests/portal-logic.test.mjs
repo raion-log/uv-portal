@@ -139,3 +139,11 @@ test('기수 × 프로그램 표 — 기수마다 한 줄, 프로그램마다 �
   assert.equal(rows[1].members, 98);
   assert.deepEqual(rows[1].cells.map((c) => c.on), [false, false]);
 });
+
+test('구글 로그인 뒤 주소에서 ?p= 가 사라져도 기억해 둔 전용 링크 코드로 돌아온다', () => {
+  assert.equal(focusFromLocation({ search: '', hash: '' }, 'flow'), 'flow');                 // 주소에 없으면 기억한 것
+  assert.equal(focusFromLocation({ search: '?p=grok', hash: '' }, 'flow'), 'grok');          // 주소가 이긴다
+  assert.equal(focusFromLocation({ search: '?code=abc', hash: '' }, 'flow'), 'flow');        // OAuth 가 붙인 ?code= 는 무시
+  assert.equal(focusFromLocation({ search: '', hash: '' }, 'Bad Code!'), '');                // 기억한 것도 모양 검사
+  assert.equal(focusFromLocation({ search: '', hash: '' }), '');
+});
