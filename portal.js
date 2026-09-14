@@ -1,5 +1,5 @@
 // UV 포털 — 로그인 뒤 역할별 화면. 데이터 보호는 서버 RLS(sql/portal.sql)가 한다; 여기는 받은 만큼만 그린다.
-import { roleOf, visiblePrograms, latestRelease, fmtBytes, validUntilLabel, releaseFormErrors,
+import { roleOf, visiblePrograms, latestRelease, releaseLines, fmtBytes, validUntilLabel, releaseFormErrors,
   focusPrograms, focusFromLocation } from './portal-logic.mjs';
 
 // ★프로그램 전용 링크 — `?p=uv-global-reaction-editor`(또는 `#…`)로 들어오면 그 프로그램 하나만 보인다. 허브로 가는 단추는 없다.
@@ -74,25 +74,33 @@ function render() {
   // 전용 링크인데 자격이 없으면 「열려 있지 않은 프로그램」, 링크 없이 자격이 하나도 없으면 「열린 프로그램 없음」
   $('focus-empty').classList.toggle('hidden', !(FOCUS && mine.length === 0));
   $('mine-empty').classList.toggle('hidden', !!FOCUS || mine.length > 0);
+  // ★판은 정식 최신과 그보다 새 후보를 따로 그린다. 최신 하나만 그리면 정식 판이 숨는다(사용자 2026-09-14 「하나만 보이는 거 같아」).
+  const line = (r, kind) => `<div class="rel ${kind}">
+        <div class="rel-head"><span class="badge ${kind}">${kind === 'stable' ? '정식' : '후보'}</span><b>${esc(r.version)}${kind === 'rc' ? ' ' + esc(r.tag.replace(/^v[\d.]+-rc\./, 'RC')) : ''}</b><span class="faint">${esc(r.tag)} · ${esc(String(r.published_at).slice(0, 10))}</span></div>
+        <div class="meta">
+          <span class="k">파일</span><code>${esc(r.file_name)}</code>
+          <span class="k">크기</span><span>${esc(fmtBytes(r.bytes))}</span>
+          <span class="k">SHA-256</span><code>${esc(r.sha256)}</code>
+        </div>
+        <div class="row">
+          <a class="dl" href="${esc(r.download_url)}">${kind === 'stable' ? '정식 판' : '후보 판'} 설치기 다운로드</a>
+          ${r.notes_url ? `<a class="btn small" href="${esc(r.notes_url)}" target="_blank" rel="noopener">바뀐 점</a>` : ''}
+        </div>
+      </div>`;
+  const histItem = (r) => `<li><span class="badge ${r.is_prerelease ? 'rc' : 'stable'}">${r.is_prerelease ? '후보' : '정식'}</span> ${esc(r.version)} <code>${esc(r.tag)}</code> · ${esc(String(r.published_at).slice(0, 10))} · ${esc(fmtBytes(r.bytes))} · <a href="${esc(r.download_url)}">받기</a></li>`;
   for (const p of mine) {
-    const rel = latestRelease(p.uvengers_releases);
+    const L = releaseLines(p.uvengers_releases);
     const m = (me.memberships || []).find((x) => x.program_code === p.code);
     const card = document.createElement('div'); card.className = 'prog';
     card.innerHTML = `
-      <h3>${esc(p.name)} ${rel ? `<span class="badge ${rel.is_prerelease ? 'rc' : 'stable'}">${rel.is_prerelease ? '후보 ' : ''}${esc(rel.version)}${rel.is_prerelease ? ' ' + esc(rel.tag.replace(/^v[\d.]+-rc\./, 'RC')) : ''}</span>` : ''}</h3>
-      <div class="muted">${esc(p.tagline || '')}</div>
-      ${rel ? `<div class="meta">
-        <span class="k">파일</span><code>${esc(rel.file_name)}</code>
-        <span class="k">크기</span><span>${esc(fmtBytes(rel.bytes))}</span>
-        <span class="k">게시일</span><span>${esc(String(rel.published_at).slice(0, 10))}</span>
-        <span class="k">SHA-256</span><code>${esc(rel.sha256)}</code>
-      </div>` : '<div class="faint">아직 배포된 판이 없습니다</div>'}
-      <div class="meta"><span class="k">이용 기한</span><span>${esc(roleOf(me) === 'admin' && !m ? '관리자' : validUntilLabel(m?.valid_until))}</span></div>
-      <div class="row">
-        ${rel ? `<a class="btn primary" href="${esc(rel.download_url)}">설치기 다운로드</a>` : ''}
-        ${p.guide_url ? `<a class="btn" href="${esc(p.guide_url)}" target="_blank" rel="noopener">설치 안내</a>` : ''}
-        ${rel?.notes_url ? `<a class="btn small" href="${esc(rel.notes_url)}" target="_blank" rel="noopener">바뀐 점</a>` : ''}
-      </div>`;
+      <h3>${esc(p.name)}</h3>
+      <p class="tagline">${esc(p.tagline || '')}</p>
+      ${L.stable ? line(L.stable, 'stable') : ''}
+      ${L.candidate ? line(L.candidate, 'rc') : ''}
+      ${!L.stable && !L.candidate ? '<div class="faint">아직 배포된 판이 없습니다</div>' : ''}
+      <div class="meta" style="margin-top:14px"><span class="k">이용 기한</span><span>${esc(roleOf(me) === 'admin' && !m ? '관리자' : validUntilLabel(m?.valid_until))}</span></div>
+      ${p.guide_url ? `<div class="row"><a class="btn" href="${esc(p.guide_url)}" target="_blank" rel="noopener">설치 안내</a></div>` : ''}
+      ${L.history.length > 1 ? `<details class="hist"><summary>모든 판 ${L.history.length}개</summary><ul>${L.history.map(histItem).join('')}</ul></details>` : ''}`;
     grid.append(card);
   }
   if (roleOf(me) === 'admin') renderAdmin();
@@ -113,6 +121,15 @@ function renderAdmin() {
     </tr>`;
   });
   t.innerHTML = `<thead><tr><th>프로그램</th><th>최신 판</th><th>정식 판</th><th>파일</th><th>판 수</th></tr></thead><tbody>${rows.join('')}</tbody>`;
+  // 배포 기록 — 프로그램 가리지 않고 전부, 새 것부터
+  const hist = programs.flatMap((p) => (p.uvengers_releases || []).map((r) => ({ ...r, program: p.name })))
+    .sort((a, b) => new Date(b.published_at) - new Date(a.published_at));
+  $('admin-releases').innerHTML = `<thead><tr><th>게시일</th><th>프로그램</th><th>판</th><th>종류</th><th>파일</th><th>크기</th><th>SHA-256</th><th></th></tr></thead><tbody>${hist.map((r) => `<tr>
+      <td class="nw">${esc(String(r.published_at).slice(0, 10))}</td><td><b>${esc(r.program)}</b></td><td class="nw">${esc(r.version)} <code>${esc(r.tag)}</code></td>
+      <td><span class="badge ${r.is_prerelease ? 'rc' : 'stable'}">${r.is_prerelease ? '후보' : '정식'}</span></td>
+      <td><code>${esc(r.file_name)}</code></td><td>${esc(fmtBytes(r.bytes))}</td><td><code>${esc(String(r.sha256 || '').slice(0, 12))}…</code></td>
+      <td><a href="${esc(r.download_url)}">받기</a>${r.notes_url ? ` · <a href="${esc(r.notes_url)}" target="_blank" rel="noopener">노트</a>` : ''}</td>
+    </tr>`).join('') || '<tr><td colspan="8" class="faint">아직 등록된 판이 없습니다</td></tr>'}</tbody>`;
   const sel = $('rel-program');
   sel.replaceChildren(...programs.map((p) => { const o = document.createElement('option'); o.value = p.code; o.textContent = p.name; return o; }));
 }

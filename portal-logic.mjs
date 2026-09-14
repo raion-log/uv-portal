@@ -75,3 +75,14 @@ export function releaseFormErrors(f) {
   if (!f.published_at) e.push('게시일을 넣으세요');
   return e;
 }
+
+/** 카드에 보일 판 줄 — 정식 최신, 그보다 새 후보(없으면 null), 전체 기록(새 것부터).
+ *  사용자 2026-09-14 「하나만 보이는 거 같아」: 최신 하나만 그리면 정식 판이 숨는다. 정식·후보를 따로 보이고 지난 판은 접어 둔다. */
+export function releaseLines(releases) {
+  const history = (releases || []).filter((r) => r && r.published_at).slice()
+    .sort((a, b) => new Date(b.published_at) - new Date(a.published_at));
+  const stable = history.find((r) => !r.is_prerelease) || null;
+  const cand = history.find((r) => r.is_prerelease) || null;
+  const candidate = cand && (!stable || new Date(cand.published_at) > new Date(stable.published_at)) ? cand : null;
+  return { stable, candidate, history };
+}

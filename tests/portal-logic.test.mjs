@@ -75,3 +75,25 @@ test('판 등록 폼은 빈 것과 틀린 모양을 한국어로 짚는다', () 
   const bad = releaseFormErrors({ ...ok, tag: '1.3.3', sha256: 'abc', bytes: 0 });
   assert.equal(bad.length, 3, bad.join(' / '));
 });
+
+test('수강생 카드에는 정식 최신과 그보다 새 후보가 따로 보이고, 지난 판은 기록으로 남는다', async () => {
+  const { releaseLines } = await import('../portal-logic.mjs');
+  const rel = [
+    { version: '1.3.0', tag: 'v1.3.0', published_at: '2026-09-08T16:09:46Z', is_prerelease: false },
+    { version: '1.3.3', tag: 'v1.3.3-rc.6', published_at: '2026-09-13T10:00:00Z', is_prerelease: true },
+    { version: '1.2.2', tag: 'v1.2.2', published_at: '2026-08-28T00:00:00Z', is_prerelease: false },
+  ];
+  const l = releaseLines(rel);
+  assert.equal(l.stable.tag, 'v1.3.0');                 // 정식 최신
+  assert.equal(l.candidate.tag, 'v1.3.3-rc.6');         // 정식보다 새 후보만
+  assert.deepEqual(l.history.map((r) => r.tag), ['v1.3.3-rc.6', 'v1.3.0', 'v1.2.2']);   // 전부, 새 것부터
+  // 정식이 후보보다 새면 후보 줄은 없다
+  const l2 = releaseLines([rel[1], { version: '1.3.3', tag: 'v1.3.3', published_at: '2026-09-20T00:00:00Z', is_prerelease: false }]);
+  assert.equal(l2.stable.tag, 'v1.3.3');
+  assert.equal(l2.candidate, null);
+  // 후보만 있으면 정식 줄은 없고 후보가 보인다
+  const l3 = releaseLines([rel[1]]);
+  assert.equal(l3.stable, null);
+  assert.equal(l3.candidate.tag, 'v1.3.3-rc.6');
+  assert.deepEqual(releaseLines([]), { stable: null, candidate: null, history: [] });
+});

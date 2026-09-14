@@ -5,11 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>UV 포털</title>
   <meta name="robots" content="noindex">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230d1526'/%3E%3Ctext x='16' y='22' font-family='Georgia' font-size='14' font-weight='bold' fill='%237b93ff' text-anchor='middle'%3EUV%3C/text%3E%3C/svg%3E">
+  <!-- 허브(raion-log/uv)와 같은 글꼴 — 제목 Nanum Myeongjo, 본문 Noto Sans KR -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@700;800&family=Noto+Sans+KR:wght@400;500;700&display=swap">
   <link rel="stylesheet" href="portal.css">
 </head>
 <body>
   <header>
-    <div class="brand"><span>UV</span> 포털</div>
+    <div class="brand"><span class="uv">UV</span><small>PORTAL</small></div>
     <div class="sub">수강생·관리자 프로그램 창구</div>
     <div class="grow"></div>
     <div class="who" id="who"></div>
@@ -36,8 +39,8 @@
     <!-- 로그인 뒤 -->
     <section id="view-app" class="hidden">
       <div class="tabs" id="tabs">
-        <button class="btn on" data-tab="mine">내 프로그램</button>
-        <button class="btn hidden" data-tab="admin" id="tab-admin">프로그램 관리</button>
+        <button class="tab on" data-tab="mine">내 프로그램</button>
+        <button class="tab hidden" data-tab="admin" id="tab-admin">프로그램 관리</button>
       </div>
 
       <div id="pane-mine">
@@ -50,6 +53,11 @@
         <div class="card">
           <h2>프로그램 전체 <span class="badge admin">관리자</span></h2>
           <div style="overflow-x:auto"><table id="admin-table"></table></div>
+        </div>
+        <div class="card">
+          <h2>배포 기록</h2>
+          <p class="faint">등록된 판 전부, 새 것부터. 수강생 카드에는 정식 최신과 그보다 새 후보만 보이고 나머지는 「모든 판」에 접혀 있습니다.</p>
+          <div style="overflow-x:auto"><table id="admin-releases"></table></div>
         </div>
         <div class="two">
           <div class="card">
