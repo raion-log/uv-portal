@@ -10,7 +10,7 @@ import { roleOf, visiblePrograms, latestRelease, pickRelease, notesLines, cohort
 const FOCUS_KEY = 'uv-portal-focus';
 const RETURNING = /access_token=|[?&]code=/.test(location.hash + location.search);   // 암묵 흐름 #access_token= / PKCE ?code=
 const remembered = (() => { try { const v = RETURNING ? (sessionStorage.getItem(FOCUS_KEY) || '') : ''; sessionStorage.removeItem(FOCUS_KEY); return v; } catch { return ''; } })();
-const FOCUS = focusFromLocation(location, remembered);
+let FOCUS = focusFromLocation(location, remembered);   // 로고(홈)를 누르면 풀린다
 
 // 공개 anon 키 — raion-admin·앱과 같은 프로젝트. 브라우저에 두라고 만든 키다(권한은 RLS 가 정한다).
 const SUPABASE_URL = 'https://dnflcjpjzqmrybtcleqy.supabase.co';
@@ -39,6 +39,22 @@ $('btn-email').addEventListener('click', () => busy($('btn-email'), async () => 
   if (error) msg('login-msg', authErrorMessage(error, 'login'));
 }));
 $('login-pw').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('btn-email').click(); });
+// ── 로고 = 홈 (사용자 2026-09-16) ──
+//   로그인 전이면 로그인 화면으로(가입·재설정 중이면 거기서 빠져나온다), 로그인 뒤면 내 프로그램 목록으로.
+//   전용 링크(?p=)로 들어왔어도 홈에서는 자기 프로그램을 다 본다 — 주소에서도 그 값을 지운다.
+$('btn-home').addEventListener('click', () => {
+  if (!entered) {
+    if (resetVerifiedFor) { resetVerifiedFor = ''; sb.auth.signOut(); }
+    authFlow = false; showView('view-login'); msg('login-msg', ''); msg('su-msg', ''); msg('reset-msg', '');
+    return;
+  }
+  FOCUS = '';
+  try { history.replaceState(null, '', location.pathname); } catch { /* 주소를 못 바꿔도 화면은 바꾼다 */ }
+  for (const x of $('tabs').querySelectorAll('[data-tab]')) { const mine = x.dataset.tab === 'mine'; x.classList.toggle('on', mine); x.setAttribute('aria-selected', mine ? 'true' : 'false'); }
+  $('pane-mine').classList.remove('hidden'); $('pane-admin').classList.add('hidden');
+  render();
+  try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch { /* 옛 브라우저 */ }
+});
 $('btn-logout').addEventListener('click', async () => { await sb.auth.signOut(); location.reload(); });
 
 // ── 로그인 전 화면 셋(로그인·재설정·가입) 중 하나만 보인다 ──
@@ -302,7 +318,7 @@ $('btn-su').addEventListener('click', () => busy($('btn-su'), async () => {
     (!error && data?.user && Array.isArray(data.user.identities) && data.user.identities.length === 0);
   if (exists) {
     showView('view-login'); $('login-email').value = f.idInput; $('login-pw').value = ''; $('login-pw').focus();
-    msg('login-msg', '이미 있는 계정입니다(편집기 앱·유유스 사이트 등에서 만든 같은 계정). 그 비밀번호로 로그인해 주세요. 비밀번호가 없거나 기억나지 않으면 「비밀번호를 잊으셨나요?」로 정할 수 있습니다.', 'ok');
+    msg('login-msg', '이미 있는 계정입니다. 그 계정의 비밀번호로 로그인해 주세요. 비밀번호가 없거나 기억나지 않으면 「비밀번호를 잊으셨나요?」로 정할 수 있습니다.', 'ok');
     return;
   }
   if (error) { msg('su-msg', authErrorMessage(error, 'signup')); return; }

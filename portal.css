@@ -17,7 +17,10 @@ a{color:var(--ac)}
 
 /* ── 머리 ─────────────────────────────────────────── */
 header{display:flex;align-items:baseline;gap:16px;max-width:1040px;margin:0 auto;padding:48px 24px 0;flex-wrap:wrap}
-header .brand{display:flex;align-items:baseline;gap:12px}
+/* 로고는 홈으로 가는 단추다 — 생김새는 그대로 두고 누를 수 있다는 것만 커서·초점 테두리로 (2026-09-16) */
+header .brand{display:flex;align-items:baseline;gap:12px;background:none;border:0;padding:0;cursor:pointer;font:inherit;color:inherit}
+header .brand:hover .uv{filter:brightness(1.12)}
+header .brand:focus-visible{outline:2px solid var(--ac);outline-offset:4px;border-radius:6px}
 header .brand .uv{
   font-family:"Nanum Myeongjo",serif;font-weight:800;font-size:2.7rem;line-height:1;color:#fff;letter-spacing:.02em;
   text-shadow:0 0 34px rgba(123,147,255,.55);

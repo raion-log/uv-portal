@@ -12,7 +12,8 @@
 </head>
 <body>
   <header>
-    <div class="brand"><span class="uv">UV</span><small>PORTAL</small></div>
+    <!-- 로고를 누르면 홈으로 — 로그인 전이면 로그인 화면, 로그인 뒤면 내 프로그램 목록(전용 링크 ?p= 도 풀린다). 사용자 2026-09-16 -->
+    <button type="button" class="brand" id="btn-home" title="홈으로"><span class="uv">UV</span><small>PORTAL</small></button>
     <div class="sub">수강생·관리자 프로그램 창구</div>
     <div class="grow"></div>
     <div class="who" id="who"></div>
@@ -24,9 +25,9 @@
     <!-- 로그인은 편집기 앱과 똑같이: Google 이메일 아이디(@ 앞부분) + 앱에서 정한 비밀번호. 구글 로그인 단추는 뺐다(사용자 2026-09-14). -->
     <section class="card login" id="view-login">
       <h2>로그인</h2>
-      <p class="muted">가입할 때 쓴 <b>Google 이메일 아이디</b>와 <b>비밀번호</b>로 들어오세요. 이 사이트·편집기 앱·유유스 사이트는 <b>같은 계정</b>을 씁니다.</p>
+      <p class="muted">이 사이트에서 <b>가입</b>하고, 여기서 정한 <b>Google 이메일 아이디와 비밀번호</b>로 <b>편집기 앱에도 그대로 로그인</b>합니다. 앱에서 따로 가입하지 않습니다.</p>
       <label for="login-email">Google 이메일 아이디 (@ 앞부분만)</label>
-      <div class="row nowrap"><input id="login-email" type="text" autocomplete="username" placeholder="예: uvgood2026" autocapitalize="off" spellcheck="false"><span class="faint">@gmail.com</span></div>
+      <div class="row nowrap"><input id="login-email" type="text" autocomplete="username" autocapitalize="off" spellcheck="false"><span class="faint">@gmail.com</span></div>
       <label for="login-pw">비밀번호</label>
       <input id="login-pw" type="password" autocomplete="current-password">
       <div class="row" style="margin-top:12px">
@@ -34,14 +35,14 @@
         <button class="btn small" id="btn-forgot" type="button">비밀번호를 잊으셨나요?</button>
       </div>
       <div id="login-msg"></div>
-      <p class="faint" style="margin:14px 0 0">처음이신가요? <a href="#" id="btn-goto-signup">가입 신청</a> — 유유스 사이트나 앱에서 이미 만든 계정이 있으면 가입하지 말고 로그인하세요. 로그인 뒤 이용 신청으로 이어집니다.</p>
+      <p class="faint" style="margin:14px 0 0">처음이신가요? <a href="#" id="btn-goto-signup">가입 신청</a> — 이미 UV 계정이 있으시면 가입하지 말고 그 계정으로 로그인하세요.</p>
     </section>
 
     <!-- 가입 — 편집기 앱과 같은 절차: 계정 만들기 → 메일의 8자리 코드 확인 → 회원행(승인 대기). 같은 표(uvengers_editor_members)에 들어간다. -->
     <section class="card login hidden" id="view-signup">
       <h2>가입 신청</h2>
-      <p class="muted">가입 후 <b>승인</b>되면 이 사이트에서 <b>설치기</b>를 받을 수 있습니다. 미리 등록된 명단과 성함·연락처 끝 4자리가 맞으면 바로 승인됩니다.
-        유유스 사이트나 앱에서 이미 만든 계정이 있으면 여기서 가입하지 말고 로그인하세요.</p>
+      <p class="muted">여기서 정한 아이디·비밀번호로 <b>편집기 앱에도 로그인</b>합니다. 가입 후 <b>승인</b>되면 이 사이트에서 <b>설치기</b>를 받을 수 있고,
+        미리 등록된 명단과 성함·연락처 끝 4자리가 맞으면 바로 승인됩니다. 이미 UV 계정이 있으시면 가입하지 말고 로그인하세요.</p>
       <label for="su-email">Google 이메일 아이디 (@ 앞부분만)</label>
       <div class="row nowrap"><input id="su-email" type="text" autocomplete="username" autocapitalize="off" spellcheck="false"><span class="faint">@gmail.com</span></div>
       <label for="su-pw">비밀번호 (6자 이상)</label><input id="su-pw" type="password" autocomplete="new-password">
@@ -93,7 +94,7 @@
         <!-- 계정은 있는데 편집기 신청(회원행)이 없는 사람 — 유유스 사이트·예전 구글 로그인·가입 중 끊긴 사람. 앱의 회원 등록 화면과 같은 일(적대평가 2026-09-15) -->
         <section class="card login hidden" id="mine-register">
           <h2>UV 글로벌 반응 편집기 이용 신청</h2>
-          <p class="muted">이 계정에는 편집기 신청 정보가 아직 없습니다(유유스 사이트나 예전 구글 로그인으로 만든 계정일 수 있습니다). 아래를 채우면 승인 확인으로 넘어가고, <b>승인되면 이 화면에 설치기가 나타납니다.</b> 명단과 성함·연락처 끝 4자리가 맞으면 바로 승인됩니다.</p>
+          <p class="muted">이 계정에는 편집기 신청 정보가 아직 없습니다(다른 UV 서비스나 예전 구글 로그인으로 만든 계정일 수 있습니다). 아래를 채우면 승인 확인으로 넘어가고, <b>승인되면 이 화면에 설치기가 나타납니다.</b> 명단과 성함·연락처 끝 4자리가 맞으면 바로 승인됩니다.</p>
           <label for="reg-name">성함</label><input id="reg-name" type="text" placeholder="홍길동" autocomplete="name">
           <div class="two">
             <div><label for="reg-phone">연락처 끝 4자리</label><input id="reg-phone" inputmode="numeric" maxlength="4" placeholder="1234" autocomplete="off"></div>
