@@ -25,7 +25,8 @@
     <!-- 로그인은 편집기 앱과 똑같이: Google 이메일 아이디(@ 앞부분) + 앱에서 정한 비밀번호. 구글 로그인 단추는 뺐다(사용자 2026-09-14). -->
     <section class="card login" id="view-login">
       <h2>로그인</h2>
-      <p class="muted">이 사이트에서 <b>가입</b>하고, 여기서 정한 <b>Google 이메일 아이디와 비밀번호</b>로 <b>편집기 앱에도 그대로 로그인</b>합니다. 앱에서 따로 가입하지 않습니다.</p>
+      <p class="muted">이 사이트 계정 하나로 <b>내게 열린 프로그램</b>을 받습니다. <b>프로그램마다 따로 가입하지 않아도 됩니다</b> —
+        로그인이 필요한 프로그램(UV 글로벌 반응 편집기 등)은 여기서 정한 <b>Google 이메일 아이디와 비밀번호</b>로 그대로 들어갑니다.</p>
       <label for="login-email">Google 이메일 아이디 (@ 앞부분만)</label>
       <div class="row nowrap"><input id="login-email" type="text" autocomplete="username" autocapitalize="off" spellcheck="false"><span class="faint">@gmail.com</span></div>
       <label for="login-pw">비밀번호</label>
@@ -41,8 +42,9 @@
     <!-- 가입 — 편집기 앱과 같은 절차: 계정 만들기 → 메일의 8자리 코드 확인 → 회원행(승인 대기). 같은 표(uvengers_editor_members)에 들어간다. -->
     <section class="card login hidden" id="view-signup">
       <h2>가입 신청</h2>
-      <p class="muted">여기서 정한 아이디·비밀번호로 <b>편집기 앱에도 로그인</b>합니다. 가입 후 <b>승인</b>되면 이 사이트에서 <b>설치기</b>를 받을 수 있고,
-        미리 등록된 명단과 성함·연락처 끝 4자리가 맞으면 바로 승인됩니다. 이미 UV 계정이 있으시면 가입하지 말고 로그인하세요.</p>
+      <p class="muted">여기서 정한 아이디·비밀번호를 그대로 씁니다 — <b>프로그램마다 따로 가입하지 않아도 됩니다.</b>
+        가입 후 <b>승인</b>되면 내게 열린 프로그램과 <b>설치기</b>가 이 화면에 나옵니다. 미리 등록된 명단과 성함·연락처 끝 4자리가 맞으면 바로 승인됩니다.
+        이미 UV 계정이 있으시면 가입하지 말고 로그인하세요.</p>
       <label for="su-email">Google 이메일 아이디 (@ 앞부분만)</label>
       <div class="row nowrap"><input id="su-email" type="text" autocomplete="username" autocapitalize="off" spellcheck="false"><span class="faint">@gmail.com</span></div>
       <label for="su-pw">비밀번호 (6자 이상)</label><input id="su-pw" type="password" autocomplete="new-password">
