@@ -129,7 +129,7 @@ function render() {
   const grid = $('mine-grid'); grid.replaceChildren();
   // 전용 링크인데 자격이 없으면 「열려 있지 않은 프로그램」, 링크 없이 자격이 하나도 없으면 「열린 프로그램 없음」
   // 승인 대기 중인 가입(편집기 표 pending)이면 「열린 프로그램 없음」 대신 「승인 대기」
-  const pending = mine.length === 0 && (me.memberships || []).some((x) => String(x.status || '').toLowerCase() === 'pending');
+  const pending = mine.length === 0 && (me.memberships || []).some(isPendingEditor);
   $('mine-pending').classList.toggle('hidden', !pending);
   $('focus-empty').classList.toggle('hidden', pending || !(FOCUS && mine.length === 0));
   $('mine-empty').classList.toggle('hidden', pending || !!FOCUS || mine.length > 0);
@@ -143,7 +143,6 @@ function render() {
   const histItem = (r) => `<li><span class="badge ${kindOf(r)}">${kindName(r)}</span> ${label(r)} · ${esc(fmtDate(r.published_at))} · ${esc(fmtBytes(r.bytes))} · <a href="${esc(r.download_url)}">받기</a></li>`;
   // 자격 줄: 관리자(자격 없음) → 「관리자」, 기수 자격 → 「○○ 기수 · 기한 없음」, 편집기인데 기한이 없으면 「승인 대기」, 나머지는 기한
   const untilLabel = (m) => (roleOf(me) === 'admin' && !m) ? '관리자'
-    : isPendingEditor(m) ? '승인 대기'
     : m?.via === 'cohort' ? `${m.cohort} 기수 · 기한 없음`
     : (m?.via === 'editor' && !m.valid_until) ? '승인 대기'
     : validUntilLabel(m?.valid_until);
@@ -167,7 +166,6 @@ function render() {
         ${pick.notes_url ? `<a class="btn small" href="${esc(pick.notes_url)}" target="_blank" rel="noopener">바뀐 점 전체</a>` : ''}
       </div>` : '<div class="faint">아직 배포된 판이 없습니다</div>'}
       <div class="meta"><span class="k">이용 기한</span><span>${esc(untilLabel(m))}</span></div>
-      ${isPendingEditor(m) ? '<p class="muted">가입 신청이 접수됐습니다. 미리 설치해 두시면 승인 뒤 앱에서 같은 계정으로 로그인해 바로 쓰실 수 있습니다.</p>' : ''}
       ${pick ? `<details class="hist"><summary>확인값${others.length ? ` · 지난 판 ${others.length}개` : ''}</summary>
         <div class="faint">SHA-256 <code>${esc(pick.sha256)}</code></div>
         ${others.length ? `<ul>${others.map(histItem).join('')}</ul>` : ''}</details>` : ''}`;

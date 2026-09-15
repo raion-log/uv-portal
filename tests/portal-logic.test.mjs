@@ -237,30 +237,24 @@ test('연락처 칸은 숫자만 끝 4자리까지 — 전화번호를 통째로
   assert.equal(lastFourDigits(''), '');
 });
 
-// ── 사이트·앱 어디서 가입해도 된다(사용자 2026-09-15 「둘 다 허용」) — 승인 대기 중에도 설치기는 받는다 ──
-test('편집기 승인 대기 회원도 편집기 카드(설치기)를 본다 — 앱은 승인 전엔 안 열리므로 미리 설치해 둔다', async () => {
-  const { pickMembership, isPendingEditor } = await import('../portal-logic.mjs');
+// ── 가입은 사이트에서, 설치기는 승인 뒤에만(사용자 2026-09-15 「설치하는 사이트에서 가입하면 거기서 승인 받고 넘어가는 거」) ──
+test('편집기 승인 대기 회원은 카드(설치기)를 못 본다 — 승인되면 그때 나타난다', async () => {
+  const { isPendingEditor } = await import('../portal-logic.mjs');
   const pending = { program_code: 'uv-global-reaction-editor', status: 'pending', valid_until: null, via: 'editor' };
   const me = { is_admin: false, memberships: [pending] };
-  assert.deepEqual(visiblePrograms(PROGRAMS, me, NOW).map((p) => p.code), ['uv-global-reaction-editor']);
-  assert.equal(isPendingEditor(pickMembership(me.memberships, 'uv-global-reaction-editor', NOW)), true);
-  // 자격이 살아 있다는 뜻은 아니다 — 기한 줄은 여전히 승인 대기
-  assert.equal(membershipAlive(pending, NOW), false);
+  assert.deepEqual(visiblePrograms(PROGRAMS, me, NOW), []);
+  assert.equal(isPendingEditor(pending), true);   // 화면은 이걸로 「승인되면 여기 설치기가 나타납니다」를 띄운다
+  const approved = { ...pending, status: 'approved', valid_until: '2027-01-31T00:00:00+09:00' };
+  assert.deepEqual(visiblePrograms(PROGRAMS, { is_admin: false, memberships: [approved] }, NOW).map((p) => p.code), ['uv-global-reaction-editor']);
+  assert.equal(isPendingEditor(approved), false);
 });
 
-test('승인 대기로 여는 것은 편집기뿐이다 — 차단·거절·다른 프로그램의 pending 은 안 보인다', async () => {
-  const me = (m) => ({ is_admin: false, memberships: [m] });
-  const ed = { program_code: 'uv-global-reaction-editor', valid_until: null, via: 'editor' };
-  assert.deepEqual(visiblePrograms(PROGRAMS, me({ ...ed, status: 'blocked' }), NOW), []);
-  assert.deepEqual(visiblePrograms(PROGRAMS, me({ ...ed, status: 'rejected' }), NOW), []);
-  assert.deepEqual(visiblePrograms(PROGRAMS, me({ program_code: 'uv-vrewauto', status: 'pending', valid_until: null, via: 'member' }), NOW), []);
-});
-
-test('포털 SQL 의 편집기 판정도 승인 대기를 연다 — 화면만 열고 서버(RLS)가 0행을 주면 카드가 안 뜬다', async () => {
+test('포털 SQL 의 편집기 판정은 승인·기한만 연다 — 승인 대기(pending)를 열지 않는다', async () => {
   const fs = await import('node:fs');
   const sql = fs.readFileSync(new URL('../sql/portal.sql', import.meta.url), 'utf8');
   const fn = sql.split('create or replace function public.portal_can_see')[1].split('$$;')[0];
-  assert.match(fn, /lower\(coalesce\(e\.status, ''\)\) = 'pending'/);
+  assert.doesNotMatch(fn.replace(/--[^\n]*/g, ''), /'pending'/);
+  assert.match(fn, /e\.valid_until is not null and e\.valid_until >= now\(\)/);
 });
 
 test('CHANGELOG 의 그 판 절에서 ### 제목만 뽑아 바뀐 점 항목으로 쓴다', async () => {
