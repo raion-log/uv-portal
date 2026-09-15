@@ -84,11 +84,14 @@ create or replace function public.portal_can_see(p_code text)
 returns boolean language sql stable security definer set search_path = public, private as $$
   select public.portal_is_admin()
       -- 편집기: 앱 관문(uvengers_editor_access_check)과 같은 판정 — valid_until 이 NULL 이면 미승인이다
+      -- ★승인 대기(pending)도 연다(사용자 2026-09-15 「둘 다 허용」): 사이트는 승인돼야 설치기를 주고 앱은 받아야 가입하던
+      --   닭·달걀을 푼다. 설치기를 받아도 앱 관문이 승인 전엔 안 연다. 차단·거절은 그대로 막는다.
       or (p_code = 'uv-global-reaction-editor' and exists (
             select 1 from public.uvengers_editor_members e
              where e.id = auth.uid()
-               and lower(coalesce(e.status, '')) in ('approved', 'active')
-               and e.valid_until is not null and e.valid_until >= now()))
+               and ((lower(coalesce(e.status, '')) in ('approved', 'active')
+                     and e.valid_until is not null and e.valid_until >= now())
+                    or lower(coalesce(e.status, '')) = 'pending')))
       or exists (
             select 1 from public.uvengers_program_members m
              where m.user_id = auth.uid() and m.program_code = p_code

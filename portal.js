@@ -1,6 +1,7 @@
 // UV 포털 — 로그인 뒤 역할별 화면. 데이터 보호는 서버 RLS(sql/portal.sql)가 한다; 여기는 받은 만큼만 그린다.
 import { roleOf, visiblePrograms, latestRelease, pickRelease, notesLines, cohortMatrix, fmtBytes, fmtDate, versionLabel, pickMembership,
-  validUntilLabel, focusPrograms, focusFromLocation, toGmail, validGmailLocal, passwordProblem, signupErrors } from './portal-logic.mjs';
+  validUntilLabel, focusPrograms, focusFromLocation, toGmail, validGmailLocal, passwordProblem, signupErrors,
+  isPendingEditor, lastFourDigits } from './portal-logic.mjs';
 
 // ★프로그램 전용 링크 — `?p=uv-global-reaction-editor`(또는 `#…`)로 들어오면 그 프로그램 하나만 보인다. 허브로 가는 단추는 없다.
 //   (사용자 2026-09-14: 「그 링크가 독립적으로만 작동하면 돼. 별도 허브로 안 넘어오고 그 프로그램만 볼 수 있게」)
@@ -142,6 +143,7 @@ function render() {
   const histItem = (r) => `<li><span class="badge ${kindOf(r)}">${kindName(r)}</span> ${label(r)} · ${esc(fmtDate(r.published_at))} · ${esc(fmtBytes(r.bytes))} · <a href="${esc(r.download_url)}">받기</a></li>`;
   // 자격 줄: 관리자(자격 없음) → 「관리자」, 기수 자격 → 「○○ 기수 · 기한 없음」, 편집기인데 기한이 없으면 「승인 대기」, 나머지는 기한
   const untilLabel = (m) => (roleOf(me) === 'admin' && !m) ? '관리자'
+    : isPendingEditor(m) ? '승인 대기'
     : m?.via === 'cohort' ? `${m.cohort} 기수 · 기한 없음`
     : (m?.via === 'editor' && !m.valid_until) ? '승인 대기'
     : validUntilLabel(m?.valid_until);
@@ -165,6 +167,7 @@ function render() {
         ${pick.notes_url ? `<a class="btn small" href="${esc(pick.notes_url)}" target="_blank" rel="noopener">바뀐 점 전체</a>` : ''}
       </div>` : '<div class="faint">아직 배포된 판이 없습니다</div>'}
       <div class="meta"><span class="k">이용 기한</span><span>${esc(untilLabel(m))}</span></div>
+      ${isPendingEditor(m) ? '<p class="muted">가입 신청이 접수됐습니다. 미리 설치해 두시면 승인 뒤 앱에서 같은 계정으로 로그인해 바로 쓰실 수 있습니다.</p>' : ''}
       ${pick ? `<details class="hist"><summary>확인값${others.length ? ` · 지난 판 ${others.length}개` : ''}</summary>
         <div class="faint">SHA-256 <code>${esc(pick.sha256)}</code></div>
         ${others.length ? `<ul>${others.map(histItem).join('')}</ul>` : ''}</details>` : ''}`;
@@ -249,6 +252,18 @@ $('btn-goto-signup').addEventListener('click', async (e) => {
   for (const c of data || []) sel.append(new Option(c.name, c.name));
 });
 $('btn-su-back').addEventListener('click', (e) => { e.preventDefault(); showView('view-login'); });
+// 연락처 끝 4자리 — 앱과 같이 숫자만 네 자리까지, 전화번호를 통째로 붙여 넣으면 끝 네 자리. 한글 조합 중에는 끝난 뒤 정리한다
+{
+  const el = $('su-phone');
+  el.addEventListener('input', (e) => { if (!e.isComposing) el.value = lastFourDigits(el.value); });
+  el.addEventListener('compositionend', () => { el.value = lastFourDigits(el.value); });
+  el.addEventListener('paste', (e) => {
+    const text = e.clipboardData?.getData('text') || '';
+    if (!/\d/.test(text)) return;
+    e.preventDefault();
+    el.value = lastFourDigits(text, { paste: true });
+  });
+}
 $('btn-su').addEventListener('click', () => busy($('btn-su'), async () => {
   const f = { idInput: $('su-email').value.trim(), password: $('su-pw').value, name: $('su-name').value.trim(),
     phone_last4: $('su-phone').value.trim(), cohort: $('su-cohort').value, referral_code: $('su-ref').value.trim() };
@@ -257,9 +272,11 @@ $('btn-su').addEventListener('click', () => busy($('btn-su'), async () => {
   const email = toGmail(f.idInput);
   const { data, error } = await sb.auth.signUp({ email, password: f.password });
   $('su-pw').value = '';
-  if (error) { msg('su-msg', /already|registered|exists/i.test(error.message) ? '이미 가입된 이메일입니다. 로그인하거나 비밀번호를 재설정해 주세요.' : '가입하지 못했습니다: ' + error.message); return; }
-  // 확인 메일이 꺼져 있거나 이미 확인된 계정이면 identities 가 비어 온다 — 앱과 같이 「이미 가입」으로 안내
-  if (data?.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) { msg('su-msg', '이미 가입된 이메일입니다. 로그인하거나 비밀번호를 재설정해 주세요.'); return; }
+  // 앱에서 먼저 가입한 사람이 여기로 온다 — 같은 계정이니 로그인만 하면 된다(사용자 2026-09-15 「둘 다 허용」)
+  const EXISTS = '이미 가입된 이메일입니다. 편집기 앱에서 가입하셨다면 그때 정한 비밀번호로 로그인해 주세요. 기억나지 않으면 로그인 화면의 「비밀번호를 잊으셨나요?」로 바꿀 수 있습니다.';
+  if (error) { msg('su-msg', /already|registered|exists/i.test(error.message) ? EXISTS : '가입하지 못했습니다: ' + error.message); return; }
+  // 확인 메일이 꺼져 있거나 이미 확인된 계정이면 identities 가 비어 온다 — 앱(auth.rs signup_already_registered)과 같이 「이미 가입」으로 안내
+  if (data?.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) { msg('su-msg', EXISTS); return; }
   pendingSignup = { email, name: f.name, phone_last4: f.phone_last4, cohort: f.cohort, referral_code: f.referral_code || null };
   $('su-step2').classList.remove('hidden');
   msg('su-msg', `${email} 로 8자리 코드를 보냈습니다. 1시간 안에 아래에 넣어 주세요.`, 'ok');

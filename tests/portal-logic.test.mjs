@@ -216,15 +216,51 @@ test('새 비밀번호는 길이만 본다(6자 이상) — 앱·서버 정책�
 });
 
 // ── 가입(앱과 같은 절차)과 릴리스 등록 스크립트의 순수 부분 ──
-test('가입 폼 검사 — 이메일 아이디·비밀번호(6자)·성함은 필수, 연락처 끝 4자리는 넣으면 숫자 4개', async () => {
-  const { signupErrors } = await import('../portal-logic.mjs');
+test('가입 폼 검사 — 이메일 아이디·비밀번호(6자)·성함·연락처 끝 4자리 모두 필수(앱과 같다)', async () => {
+  const { signupErrors, PHONE_MSG } = await import('../portal-logic.mjs');
   const ok = { idInput: 'uvgood2026', password: 'abcdef', name: '홍길동', phone_last4: '1234', cohort: '유유스 1기', referral_code: '' };
   assert.deepEqual(signupErrors(ok), []);
-  assert.deepEqual(signupErrors({ ...ok, phone_last4: '' }), []);                                  // 선택
+  // ★끝 4자리는 미리 올린 명단과 맞춰 자동 승인하는 열쇠다 — 비우면 명단에 있어도 승인 대기로 간다(2026-09-15)
+  assert.deepEqual(signupErrors({ ...ok, phone_last4: '' }), [PHONE_MSG]);
+  assert.deepEqual(signupErrors({ ...ok, phone_last4: '12a' }), [PHONE_MSG]);
+  assert.deepEqual(signupErrors({ ...ok, phone_last4: '12345' }), [PHONE_MSG]);
   assert.deepEqual(signupErrors({ ...ok, name: '' }), ['성함을 넣어 주세요']);
   assert.deepEqual(signupErrors({ ...ok, password: 'abc' }), ['비밀번호는 6자 이상이어야 합니다.']);
   assert.deepEqual(signupErrors({ ...ok, idInput: '한글' }), ['이메일 아이디(@ 앞부분)만 입력해 주세요']);
-  assert.deepEqual(signupErrors({ ...ok, phone_last4: '12a' }), ['연락처 끝 4자리는 숫자 4개입니다']);
+});
+
+test('연락처 칸은 숫자만 끝 4자리까지 — 전화번호를 통째로 붙여 넣으면 끝 4자리(앱과 같다)', async () => {
+  const { lastFourDigits } = await import('../portal-logic.mjs');
+  assert.equal(lastFourDigits('010-1234-5678', { paste: true }), '5678');
+  assert.equal(lastFourDigits('12a3'), '123');
+  assert.equal(lastFourDigits('123456'), '1234');   // 치는 중에는 앞 네 자리에서 멈춘다(앱 keepFour)
+  assert.equal(lastFourDigits(''), '');
+});
+
+// ── 사이트·앱 어디서 가입해도 된다(사용자 2026-09-15 「둘 다 허용」) — 승인 대기 중에도 설치기는 받는다 ──
+test('편집기 승인 대기 회원도 편집기 카드(설치기)를 본다 — 앱은 승인 전엔 안 열리므로 미리 설치해 둔다', async () => {
+  const { pickMembership, isPendingEditor } = await import('../portal-logic.mjs');
+  const pending = { program_code: 'uv-global-reaction-editor', status: 'pending', valid_until: null, via: 'editor' };
+  const me = { is_admin: false, memberships: [pending] };
+  assert.deepEqual(visiblePrograms(PROGRAMS, me, NOW).map((p) => p.code), ['uv-global-reaction-editor']);
+  assert.equal(isPendingEditor(pickMembership(me.memberships, 'uv-global-reaction-editor', NOW)), true);
+  // 자격이 살아 있다는 뜻은 아니다 — 기한 줄은 여전히 승인 대기
+  assert.equal(membershipAlive(pending, NOW), false);
+});
+
+test('승인 대기로 여는 것은 편집기뿐이다 — 차단·거절·다른 프로그램의 pending 은 안 보인다', async () => {
+  const me = (m) => ({ is_admin: false, memberships: [m] });
+  const ed = { program_code: 'uv-global-reaction-editor', valid_until: null, via: 'editor' };
+  assert.deepEqual(visiblePrograms(PROGRAMS, me({ ...ed, status: 'blocked' }), NOW), []);
+  assert.deepEqual(visiblePrograms(PROGRAMS, me({ ...ed, status: 'rejected' }), NOW), []);
+  assert.deepEqual(visiblePrograms(PROGRAMS, me({ program_code: 'uv-vrewauto', status: 'pending', valid_until: null, via: 'member' }), NOW), []);
+});
+
+test('포털 SQL 의 편집기 판정도 승인 대기를 연다 — 화면만 열고 서버(RLS)가 0행을 주면 카드가 안 뜬다', async () => {
+  const fs = await import('node:fs');
+  const sql = fs.readFileSync(new URL('../sql/portal.sql', import.meta.url), 'utf8');
+  const fn = sql.split('create or replace function public.portal_can_see')[1].split('$$;')[0];
+  assert.match(fn, /lower\(coalesce\(e\.status, ''\)\) = 'pending'/);
 });
 
 test('CHANGELOG 의 그 판 절에서 ### 제목만 뽑아 바뀐 점 항목으로 쓴다', async () => {

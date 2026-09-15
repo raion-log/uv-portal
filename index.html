@@ -24,7 +24,7 @@
     <!-- 로그인은 편집기 앱과 똑같이: Google 이메일 아이디(@ 앞부분) + 앱에서 정한 비밀번호. 구글 로그인 단추는 뺐다(사용자 2026-09-14). -->
     <section class="card login" id="view-login">
       <h2>로그인</h2>
-      <p class="muted">편집기 앱에 가입할 때 쓴 <b>Google 이메일 아이디</b>와 <b>그때 정한 비밀번호</b>로 들어오세요. 여기서 새로 가입하지 않습니다.</p>
+      <p class="muted">편집기 앱이나 이 사이트에서 가입할 때 쓴 <b>Google 이메일 아이디</b>와 <b>그때 정한 비밀번호</b>로 들어오세요. 한 계정으로 앱과 사이트를 함께 씁니다.</p>
       <label for="login-email">Google 이메일 아이디 (@ 앞부분만)</label>
       <div class="row nowrap"><input id="login-email" type="text" autocomplete="username" placeholder="예: uvgood2026" autocapitalize="off" spellcheck="false"><span class="faint">@gmail.com</span></div>
       <label for="login-pw">비밀번호</label>
@@ -34,19 +34,20 @@
         <button class="btn small" id="btn-forgot" type="button">비밀번호를 잊으셨나요?</button>
       </div>
       <div id="login-msg"></div>
-      <p class="faint" style="margin:14px 0 0">처음이신가요? <a href="#" id="btn-goto-signup">가입 신청</a> — 관리자 승인 뒤에 프로그램이 보입니다.</p>
+      <p class="faint" style="margin:14px 0 0">처음이신가요? <a href="#" id="btn-goto-signup">가입 신청</a> — 앱에서 이미 가입하셨다면 다시 가입하지 말고 그 계정으로 로그인하세요.</p>
     </section>
 
     <!-- 가입 — 편집기 앱과 같은 절차: 계정 만들기 → 메일의 8자리 코드 확인 → 회원행(승인 대기). 같은 표(uvengers_editor_members)에 들어간다. -->
     <section class="card login hidden" id="view-signup">
       <h2>가입 신청</h2>
-      <p class="muted">가입 후 <b>관리자 승인</b>을 받아야 프로그램이 보입니다. 아래 정보는 승인 확인에 쓰입니다.</p>
+      <p class="muted">가입하면 바로 <b>편집기 설치기</b>를 받을 수 있고, 프로그램 사용은 <b>관리자 승인</b> 뒤에 열립니다. 아래 정보는 승인 확인에 쓰입니다.
+        앱에서 이미 가입하셨다면 여기서 다시 가입하지 말고 로그인하세요.</p>
       <label for="su-email">Google 이메일 아이디 (@ 앞부분만)</label>
       <div class="row nowrap"><input id="su-email" type="text" autocomplete="username" autocapitalize="off" spellcheck="false"><span class="faint">@gmail.com</span></div>
       <label for="su-pw">비밀번호 (6자 이상)</label><input id="su-pw" type="password" autocomplete="new-password">
       <label for="su-name">성함</label><input id="su-name" type="text" placeholder="홍길동" autocomplete="name">
       <div class="two">
-        <div><label for="su-phone">연락처 끝 4자리</label><input id="su-phone" inputmode="numeric" maxlength="4" placeholder="1234"></div>
+        <div><label for="su-phone">연락처 끝 4자리</label><input id="su-phone" inputmode="numeric" maxlength="4" placeholder="1234" autocomplete="off"></div>
         <div><label for="su-cohort">기수</label><select id="su-cohort"><option value="">기수 선택</option></select></div>
       </div>
       <label for="su-ref">추천코드 <span class="faint">[선택]</span></label><input id="su-ref" type="text" placeholder="있으면 입력하세요">
