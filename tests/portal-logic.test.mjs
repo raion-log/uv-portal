@@ -249,12 +249,61 @@ test('편집기 승인 대기 회원은 카드(설치기)를 못 본다 — 승�
   assert.equal(isPendingEditor(approved), false);
 });
 
-test('포털 SQL 의 편집기 판정은 승인·기한만 연다 — 승인 대기(pending)를 열지 않는다', async () => {
+test('포털 SQL 의 편집기 판정은 승인·기한만 연다 — 편집기 갈래를 글자 그대로 대조(주석 빼고)', async () => {
   const fs = await import('node:fs');
   const sql = fs.readFileSync(new URL('../sql/portal.sql', import.meta.url), 'utf8');
-  const fn = sql.split('create or replace function public.portal_can_see')[1].split('$$;')[0];
-  assert.doesNotMatch(fn.replace(/--[^\n]*/g, ''), /'pending'/);
-  assert.match(fn, /e\.valid_until is not null and e\.valid_until >= now\(\)/);
+  const code = sql.split('create or replace function public.portal_can_see')[1].split('$$;')[0]
+    .replace(/--[^\n]*/g, '').replace(/\s+/g, ' ').trim();
+  // ★갈래를 통째로 대조한다 — 부분 일치는 「or 조건 하나 더」·「조건을 주석으로」 변이를 못 잡았다(적대평가 2026-09-15)
+  const editor = code.match(/or \(p_code = 'uv-global-reaction-editor' and exists \((.*?)\)\) or exists/);
+  assert.ok(editor, '편집기 갈래를 못 찾음');
+  assert.equal(editor[1].trim(),
+    "select 1 from public.uvengers_editor_members e where e.id = auth.uid() and lower(coalesce(e.status, '')) in ('approved', 'active') and e.valid_until is not null and e.valid_until >= now()");
+  assert.doesNotMatch(code, /pending|blocked/);
+});
+
+// ── 계정은 있는데 편집기 신청(회원행)이 없는 사람 — 유유스 사이트·옛 구글 로그인·가입 중 끊긴 사람(적대평가 2026-09-15 막다른 길) ──
+test('편집기 신청이 없는 로그인 사용자에게는 사이트에서 신청을 이어 준다', async () => {
+  const { needsEditorRegistration } = await import('../portal-logic.mjs');
+  const student = (memberships) => ({ is_admin: false, memberships });
+  assert.equal(needsEditorRegistration(student([]), ''), true);
+  assert.equal(needsEditorRegistration(student([]), 'uv-global-reaction-editor'), true);
+  // 다른 프로그램 전용 링크로 들어온 사람에게는 편집기 신청을 들이밀지 않는다
+  assert.equal(needsEditorRegistration(student([]), 'flow'), false);
+  // 기수 자격만 있는 사람(편집기 행 없음)도 편집기 신청은 이어 준다
+  assert.equal(needsEditorRegistration(student([{ program_code: 'flow', via: 'cohort', status: 'approved' }]), ''), true);
+  // 편집기 행이 있으면(대기·승인·차단 무엇이든) 신청 폼은 없다
+  for (const status of ['pending', 'approved', 'blocked']) {
+    assert.equal(needsEditorRegistration(student([{ program_code: 'uv-global-reaction-editor', via: 'editor', status }]), ''), false, status);
+  }
+  assert.equal(needsEditorRegistration({ is_admin: true, memberships: [] }, ''), false);
+  assert.equal(needsEditorRegistration(null, ''), false);
+});
+
+test('신청 폼 검사 — 성함·연락처 끝 4자리 필수(가입과 같은 문구)', async () => {
+  const { registerErrors, PHONE_MSG } = await import('../portal-logic.mjs');
+  assert.deepEqual(registerErrors({ name: '홍길동', phone_last4: '1234' }), []);
+  assert.deepEqual(registerErrors({ name: ' ', phone_last4: '1234' }), ['성함을 넣어 주세요']);
+  assert.deepEqual(registerErrors({ name: '홍길동', phone_last4: '' }), [PHONE_MSG]);
+});
+
+test('승인 대기 안내는 편집기 대기일 때 — 다른 카드가 있어도 보이고, 다른 프로그램 전용 링크에서는 안 보인다', async () => {
+  const { showPendingNotice } = await import('../portal-logic.mjs');
+  const pending = { is_admin: false, memberships: [{ program_code: 'uv-global-reaction-editor', via: 'editor', status: 'pending' }, { program_code: 'flow', via: 'cohort', status: 'approved' }] };
+  assert.equal(showPendingNotice(pending, ''), true);                          // flow 카드가 있어도 편집기 대기는 알린다
+  assert.equal(showPendingNotice(pending, 'uv-global-reaction-editor'), true);
+  assert.equal(showPendingNotice(pending, 'flow'), false);                     // flow 링크에서 「설치기가 나타납니다」는 틀린 말
+  assert.equal(showPendingNotice({ is_admin: false, memberships: [] }, ''), false);
+});
+
+test('로그인·코드 요청 오류를 사람 말로 — 메일 확인 전 계정, 발송 한도, 틀린 비밀번호', async () => {
+  const { authErrorMessage } = await import('../portal-logic.mjs');
+  assert.match(authErrorMessage({ code: 'email_not_confirmed', message: 'Email not confirmed' }, 'login'), /8자리 코드.*아직/);
+  assert.match(authErrorMessage({ message: 'Email not confirmed' }, 'login'), /8자리 코드.*아직/);
+  assert.match(authErrorMessage({ code: 'over_email_send_rate_limit', status: 429, message: 'email rate limit exceeded' }, 'reset'), /잠시 뒤/);
+  assert.match(authErrorMessage({ status: 429, message: 'Too many requests' }, 'signup'), /잠시 뒤/);
+  assert.match(authErrorMessage({ code: 'invalid_credentials', status: 400, message: 'Invalid login credentials' }, 'login'), /아이디 또는 비밀번호/);
+  assert.doesNotMatch(authErrorMessage({ status: 500, message: 'boom' }, 'reset'), /^boom$/);   // 영문 원문만 덩그러니 보이지 않게
 });
 
 test('CHANGELOG 의 그 판 절에서 ### 제목만 뽑아 바뀐 점 항목으로 쓴다', async () => {

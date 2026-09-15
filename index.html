@@ -24,7 +24,7 @@
     <!-- 로그인은 편집기 앱과 똑같이: Google 이메일 아이디(@ 앞부분) + 앱에서 정한 비밀번호. 구글 로그인 단추는 뺐다(사용자 2026-09-14). -->
     <section class="card login" id="view-login">
       <h2>로그인</h2>
-      <p class="muted">편집기 앱이나 이 사이트에서 가입할 때 쓴 <b>Google 이메일 아이디</b>와 <b>그때 정한 비밀번호</b>로 들어오세요. 한 계정으로 앱과 사이트를 함께 씁니다.</p>
+      <p class="muted">가입할 때 쓴 <b>Google 이메일 아이디</b>와 <b>비밀번호</b>로 들어오세요. 이 사이트·편집기 앱·유유스 사이트는 <b>같은 계정</b>을 씁니다.</p>
       <label for="login-email">Google 이메일 아이디 (@ 앞부분만)</label>
       <div class="row nowrap"><input id="login-email" type="text" autocomplete="username" placeholder="예: uvgood2026" autocapitalize="off" spellcheck="false"><span class="faint">@gmail.com</span></div>
       <label for="login-pw">비밀번호</label>
@@ -34,14 +34,14 @@
         <button class="btn small" id="btn-forgot" type="button">비밀번호를 잊으셨나요?</button>
       </div>
       <div id="login-msg"></div>
-      <p class="faint" style="margin:14px 0 0">처음이신가요? <a href="#" id="btn-goto-signup">가입 신청</a> — 앱에서 이미 가입하셨다면 다시 가입하지 말고 그 계정으로 로그인하세요.</p>
+      <p class="faint" style="margin:14px 0 0">처음이신가요? <a href="#" id="btn-goto-signup">가입 신청</a> — 유유스 사이트나 앱에서 이미 만든 계정이 있으면 가입하지 말고 로그인하세요. 로그인 뒤 이용 신청으로 이어집니다.</p>
     </section>
 
     <!-- 가입 — 편집기 앱과 같은 절차: 계정 만들기 → 메일의 8자리 코드 확인 → 회원행(승인 대기). 같은 표(uvengers_editor_members)에 들어간다. -->
     <section class="card login hidden" id="view-signup">
       <h2>가입 신청</h2>
-      <p class="muted">가입 후 <b>승인</b>되면 이 사이트에서 <b>설치기</b>를 받을 수 있습니다. 아래 정보는 승인 확인에 쓰입니다.
-        앱에서 이미 가입하셨다면 여기서 다시 가입하지 말고 로그인하세요.</p>
+      <p class="muted">가입 후 <b>승인</b>되면 이 사이트에서 <b>설치기</b>를 받을 수 있습니다. 미리 등록된 명단과 성함·연락처 끝 4자리가 맞으면 바로 승인됩니다.
+        유유스 사이트나 앱에서 이미 만든 계정이 있으면 여기서 가입하지 말고 로그인하세요.</p>
       <label for="su-email">Google 이메일 아이디 (@ 앞부분만)</label>
       <div class="row nowrap"><input id="su-email" type="text" autocomplete="username" autocapitalize="off" spellcheck="false"><span class="faint">@gmail.com</span></div>
       <label for="su-pw">비밀번호 (6자 이상)</label><input id="su-pw" type="password" autocomplete="new-password">
@@ -50,6 +50,7 @@
         <div><label for="su-phone">연락처 끝 4자리</label><input id="su-phone" inputmode="numeric" maxlength="4" placeholder="1234" autocomplete="off"></div>
         <div><label for="su-cohort">기수</label><select id="su-cohort"><option value="">기수 선택</option></select></div>
       </div>
+      <p class="faint" style="margin:6px 0 0">연락처는 휴대폰 번호의 <b>마지막 네 자리</b>입니다 (010-1234-<b>5678</b> → 5678).</p>
       <label for="su-ref">추천코드 <span class="faint">[선택]</span></label><input id="su-ref" type="text" placeholder="있으면 입력하세요">
       <div class="row" style="margin-top:12px"><button class="btn primary" id="btn-su">가입 신청</button></div>
       <div id="su-step2" class="hidden">
@@ -88,8 +89,21 @@
       </div>
 
       <div id="pane-mine">
+        <p class="muted hidden" id="mine-pending">UV 글로벌 반응 편집기 가입 신청이 접수되었습니다(승인 대기). <b>승인되면 이 화면에 설치기가 나타납니다.</b> 설치 뒤 앱에서는 같은 계정으로 로그인만 하시면 됩니다.</p>
+        <!-- 계정은 있는데 편집기 신청(회원행)이 없는 사람 — 유유스 사이트·예전 구글 로그인·가입 중 끊긴 사람. 앱의 회원 등록 화면과 같은 일(적대평가 2026-09-15) -->
+        <section class="card login hidden" id="mine-register">
+          <h2>UV 글로벌 반응 편집기 이용 신청</h2>
+          <p class="muted">이 계정에는 편집기 신청 정보가 아직 없습니다(유유스 사이트나 예전 구글 로그인으로 만든 계정일 수 있습니다). 아래를 채우면 승인 확인으로 넘어가고, <b>승인되면 이 화면에 설치기가 나타납니다.</b> 명단과 성함·연락처 끝 4자리가 맞으면 바로 승인됩니다.</p>
+          <label for="reg-name">성함</label><input id="reg-name" type="text" placeholder="홍길동" autocomplete="name">
+          <div class="two">
+            <div><label for="reg-phone">연락처 끝 4자리</label><input id="reg-phone" inputmode="numeric" maxlength="4" placeholder="1234" autocomplete="off"></div>
+            <div><label for="reg-cohort">기수</label><select id="reg-cohort"><option value="">기수 선택</option></select></div>
+          </div>
+          <p class="faint" style="margin:6px 0 0">연락처는 휴대폰 번호의 <b>마지막 네 자리</b>입니다 (010-1234-<b>5678</b> → 5678).</p>
+          <div class="row" style="margin-top:12px"><button class="btn primary" id="btn-reg">이용 신청</button></div>
+          <div id="reg-msg"></div>
+        </section>
         <div class="grid" id="mine-grid"></div>
-        <p class="muted hidden" id="mine-pending">가입 신청이 접수되었습니다(승인 대기). <b>승인되면 이 화면에 설치기가 나타납니다.</b> 설치 뒤 앱에서는 같은 계정으로 로그인만 하시면 됩니다.</p>
         <p class="muted hidden" id="mine-empty">지금 계정에 열린 프로그램이 없습니다. 가입 승인이나 이용 기한을 관리자에게 확인해 주세요.</p>
         <p class="muted hidden" id="focus-empty">이 계정에는 열려 있지 않은 프로그램입니다. 가입 승인이나 이용 기한을 관리자에게 확인해 주세요.</p>
       </div>
